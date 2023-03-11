@@ -1,0 +1,11 @@
+#potentialMatchesSection tr.locationFiltered,
+#potentialMatchesSection tr.nameFiltered,
+#potentialMatchesSection tr.dateFiltered {
+  display: none;
+}
+#filterButtons {
+  float: right;
+}
+body.page-Special_EditFamilySteps table {
+  clear: both;
+}

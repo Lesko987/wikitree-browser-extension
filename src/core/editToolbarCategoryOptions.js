@@ -1,3 +1,7 @@
+/*
+Created By: Aleš Trtnik (Trtnik-2)
+*/
+
 import { wtPlus } from "../features/wtPlus/wtPlus";
 import { editToolbarApp, editToolbarWiki } from "./editToolbar";
 export default [
@@ -100,6 +104,23 @@ export default [
           },
           { featureid: "wtplus", title: "CategoryInfoBox", call: wtPlus, params: { template: "CategoryInfoBox" } },
         ],
+      },
+    ],
+  },
+  {
+    button: "Categories",
+    items: [
+      {
+        featureid: "wtplus",
+        title: "Add location category",
+        call: wtPlus,
+        params: { action: "AddCIBCategory", data: "Location" },
+      },
+      {
+        featureid: "wtplus",
+        title: "Add cemetery group",
+        call: wtPlus,
+        params: { action: "AddCIBCategory", data: "CemeteryGroup" },
       },
     ],
   },

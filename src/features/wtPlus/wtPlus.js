@@ -1,11 +1,16 @@
-import "./wtPlus.css";
-import { checkIfFeatureEnabled } from "../../core/options/options_storage";
-import { isEditPage } from "../../core/common";
+/*
+Created By: Aleš Trtnik (Trtnik-2)
+*/
+
+import { isWikiEdit } from "../../core/pageType";
+import { checkIfFeatureEnabled, getFeatureOptions } from "../../core/options/options_storage";
+import { wtAPICatCIBSearch } from "../../core/wtPlusAPI/wtPlusAPI";
 
 let tb = {};
 
 checkIfFeatureEnabled("wtplus").then((result) => {
-  if (result && isEditPage) {
+  if (result && isWikiEdit) {
+    import("./wtPlus.css");
     initWTPlus();
   }
 });
@@ -732,7 +737,7 @@ function selectTemplate(data) {
     '<input type="checkbox" class="cbFilter" id="cb5" name="cb5" data-op="onDlgSelectTemplateFlt" data-id="5" value="CategoryInfoBox"' +
     (data == "CategoryInfoBox" ? " checked" : "") +
     '><label for="cb5"> CategoryInfoBox</label><br>' +
-    '<label for="flt1">Filter: </label><input type="text" class="cbFilter" id="flt1" name="flt1" data-op="onDlgSelectTemplateFlt" data-id="9"><br>' +
+    '<label for="flt1">Filter: </label><input type="text" class="cbFilter" id="flt1" name="flt1" data-op="onDlgSelectTemplateFlt" data-id="9" autofocus><br>' +
     '<div style="min-width: 600px;overflow-y:auto;height: 400px;"><table style="width: 100%;" id="tb">' +
     tb.templates
       .map(
@@ -761,7 +766,7 @@ function selectTemplate(data) {
 }
 
 function onDlgSelectTemplateFlt() {
-  let lb = tb.elDlg.querySelector("#tb");
+  var lb = tb.elDlg.querySelector("#tb");
   var s0 = "";
   for (let i = 1; i <= 5; i++) {
     if (tb.elDlg.querySelector("#cb" + i).checked)
@@ -823,11 +828,20 @@ function onDlgSelectTemplateBtn(update) {
 /**************************/
 
 function selectCIB(data) {
-  tb.elDlg.innerHTML =
-    "<h3>Select " + data + " Category</h3>" +
-    '<input type="checkbox" class="cbFilter" id="cb1" name="cb1" data-op="onDlgSelectCIBFlt" data-id="' + data + '" value="' + data + '" checked>' +
-    '<label for="cb1"> ' + data + '</label><br>' +
-    '<label for="flt1">Filter: </label><input type="text" class="cbFilter" id="flt1" name="flt1" data-op="onDlgSelectCIBFlt" data-id="9"><br>' +
+  tb.elDlgCIB.innerHTML =
+    "<h3>Select " +
+    data +
+    " Category</h3>" +
+    '<input type="checkbox" class="cbFilter" id="cb1" name="cb1" data-op="onDlgSelectCIBFlt" data-id="' +
+    data +
+    '" value="' +
+    data +
+    '" checked>' +
+    '<label for="cb1"> ' +
+    data +
+    "</label><br>" +
+    '<label for="flt1">Filter: </label><input type="text" class="cbFilter" id="flt1" name="flt1" data-op="onDlgSelectCIBFlt" data-id="9" autofocus>' +
+    '<label id="cntr">enter word(s) to find</label><br>' +
     '<div style="min-width: 600px;overflow-y:auto;height: 400px;"><table style="width: 100%;" id="tb">' +
     "</table></div>" +
     '<div style="text-align:right">' +
@@ -838,74 +852,115 @@ function selectCIB(data) {
     "</div>";
   attachEvents("button.dlgClick", "click");
   attachEvents("input.cbFilter", "input");
-  attachEvents("tr.trSelect", "click");
+  //  attachEvents("td.tdSelect", "click");
   onDlgSelectCIBFlt();
-  tb.elDlg.showModal();
+  tb.elDlgCIB.showModal();
 }
 
 function onDlgSelectCIBFlt() {
-  let lb = tb.elDlg.querySelector("#tb");
-  var s0 = tb.elDlg.querySelector("#cb1").value;
-  var s1 = tb.elDlg.querySelector("#flt1").value;
-  
-  // Retrieve categories
-  fetch("https://wikitree.sdms.si/function/WTCatCIBSearch/Category.json?Query=" + s1 + "&cib=" + s0 + "&Format=json")
-    .then((resp) => resp.json())
-    .then((jsonData) => {
+  let lb = tb.elDlgCIB.querySelector("#tb");
+  let cntr = tb.elDlgCIB.querySelector("#cntr");
+  var s0 = tb.elDlgCIB.querySelector("#cb1").value;
+  var s1 = tb.elDlgCIB.querySelector("#flt1").value;
+
+  if (s1.length < 3) {
+    cntr.innerHTML = "enter word(s) to find"
+  } else {
+    // Retrieve categories
+    cntr.innerHTML = "Retrieving...";
+    wtAPICatCIBSearch("CIBPicker", s0, s1)
+      .then((jsonData) => {
         let c = jsonData.response.categories;
         if (!c) {
           c = [];
         }
-        lb.innerHTML = 
-        c.map(
-          (item) =>
-            '<tr class="trSelect" data-op="onDlgSelectCIBTrSel"><td title="Name: ' + 
-            item.name + 
-            "&#10;AKA: " +
-            item.aka +
-            "&#10;Parent: " +
-            item.parent +
-            "&#10;Location: " +
-            item.location + 
-            '">' +
-            item.displayname +
-            "</td></tr>"
-        )
-        .join("\n");
-      attachEvents("tr.trSelect", "click");
-
-    });
-
-
+        switch (c.length) {
+          case 0:
+            cntr.innerHTML = "no matches";
+            break;
+          case 1:
+            cntr.innerHTML = c.length + " match";
+            break;
+          case 100:
+            cntr.innerHTML = "more than 100 matches";
+            break;
+          default:
+            cntr.innerHTML = c.length + " matches";
+        }
+        lb.innerHTML = c
+          .map(
+            (item) =>
+              "<tr>" +
+              `<td><a target="_blank" href="https://www.wikitree.com/wiki/Category:${
+                item.category
+              }"><img src="${chrome.runtime.getURL("images/newTab.png")}"'></a></td>` +
+              '<td class="tdSelect" data-op="onDlgSelectCIBTrSel" title="' +
+              (item.name ? "&#10;Name: " + item.name : "") +
+              (item.aka ? "&#10;aka:&#10;&nbsp;&nbsp;" + item.aka.replaceAll(";", "&#10;&nbsp;&nbsp;") : "") +
+              (item.parent ? "&#10;Parent: " + item.parent : "") +
+              (item.gParent ? "&#10;&nbsp;&nbsp;" + item.gParent : "") +
+              (item.ggParent ? "&#10;&nbsp;&nbsp;&nbsp;&nbsp;" + item.ggParent : "") +
+              (item.gggParent ? "&#10;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" + item.gggParent : "") +
+              (item.parent1 ? "&#10;Parent 1: " + item.parent1 : "") +
+              (item.gParent1 ? "&#10;&nbsp;&nbsp;" + item.gParent1 : "") +
+              (item.parent2 ? "&#10;Parent 2: " + item.parent2 : "") +
+              (item.gParent2 ? "&#10;&nbsp;&nbsp;" + item.gParent2 : "") +
+              (item.location ? "&#10;Location: " + item.location : "") +
+              (item.locationParent ? "&#10;&nbsp;&nbsp;" + item.locationParent : "") +
+              (item.location1 ? "&#10;Location 1: " + item.location1 : "") +
+              (item.location1Parent ? "&#10;&nbsp;&nbsp;" + item.location1Parent : "") +
+              (item.succ1prev ? "&#10;Succession: " + item.succ1prev : "") +
+              (item.succ1next ? "&#10;&nbsp;" + item.succ1next : "") +
+              (item.succ1prev1 ? "&#10;Succession: " + item.succ1prev1 : "") +
+              (item.succ1next1 ? "&#10;&nbsp;" + item.succ1next1 : "") +
+              (item.succ1prev2 ? "&#10;Succession: " + item.succ1prev2 : "") +
+              (item.succ1next2 ? "&#10;&nbsp;" + item.succ1next2 : "") +
+              (item.succ1prev3 ? "&#10;Succession: " + item.succ1prev3 : "") +
+              (item.succ1next3 ? "&#10;&nbsp;" + item.succ1next3 : "") +
+              (item.succ2prev ? "&#10;Succession: " + item.succ2prev : "") +
+              (item.succ2next ? "&#10;&nbsp;" + item.succ2next : "") +
+              (item.other ? "&#10;Other:&#10;&nbsp;&nbsp;" + item.other.replaceAll(";", "&#10;&nbsp;&nbsp;") : "") +
+              '">' +
+              item.category +
+              "</td>" +
+              "</tr>"
+          )
+          .join("\n");
+        attachEvents("td.tdSelect", "click");
+      })
+      .catch((error) => {
+        lb.innerHTML = '<tr><td style="color:red">Error in WikiTree+ server' + error + "</td></tr>";
+      });
+  }
 }
 
-function onDlgSelectCIBTrSel(tr) {
-  removeClass("tr.trSelect", "trSelected");
-  tr.classList.add("trSelected");
+function onDlgSelectCIBTrSel(td) {
+  removeClass("td.tdSelect", "tdSelected");
+  td.classList.add("tdSelected");
 }
 
 function onDlgSelectCIBBtn(update) {
   if (update === "1") {
-    if (tb.elDlg.querySelectorAll(".trSelected>td").length === 0) {
+    if (tb.elDlgCIB.querySelectorAll("td.tdSelected").length === 0) {
       alert("No category selected: Select a category before closing the dialog");
       return false;
     }
-    tb.elDlg.close();
+    tb.elDlgCIB.close();
     //Add template
 
-    tb.inserttext = '[[Category:' + tb.elDlg.querySelectorAll(".trSelected>td")[0].innerText + ']]\n';
+    tb.inserttext = "[[Category:" + tb.elDlgCIB.querySelectorAll("td.tdSelected")[0].innerText + "]]\n";
     tb.textResult = tb.inserttext + tb.textAll;
     tb.selStart = tb.textBefore.length;
     tb.selEnd = tb.selStart + tb.inserttext.length;
     tb.birthLocationResult = "";
     tb.deathLocationResult = "";
+    tb.addToSummary = "Added " + tb.elDlgCIB.querySelector("#cb1").value + " Category";
     updateEdit();
-
   } else {
-    tb.elDlg.close();
-    tb.elDlg.innerHTML = "";
+    tb.elDlgCIB.close();
     tb.addToSummary = "";
   }
+  tb.elDlgCIB.innerHTML = "";
   return false;
 }
 
@@ -917,6 +972,7 @@ function AutoUpdate() {
   let s0 = "";
   let s1 = "";
   let s2 = "";
+  let s3 = "";
   for (var loc = 0; loc < 3; loc++) {
     let actArr = "";
     if (loc == 0) {
@@ -941,7 +997,7 @@ function AutoUpdate() {
     if (actArr) {
       for (var j = 0; j < actArr.length; j++) {
         let clean = actArr[j];
-        let s3 = "";
+        s3 = "";
         for (var i = 0; i < clean.actions.length; i++) {
           let s = s1;
           let action = clean.actions[i];
@@ -1046,7 +1102,6 @@ function onDlgProfileCleanupBtn(update) {
             let clean = actArr[j];
 
             let s = "";
-            let s1 = "";
             let s3 = "";
             for (var i = 0; i < clean.actions.length; i++) {
               s = s1;
@@ -1100,7 +1155,9 @@ function pasteSource() {
     "<h3>Paste source</h3>" +
     '<label for="srcPaste">Clipboard:</label><br>' +
     '<textarea class="srcPaste" data-op="onDlgPasteSourcePaste" data-id="1" placeholder="Paste a source or URL here." rows="5" cols="80"></textarea><br>' +
-    '<input type="checkbox" class="cbInline" id="cb1" name="cb1" data-op="onDlgPasteSourceCB" data-id="1" value="Inline" checked><label for="cb1"> Inline citation</label><br>' +
+    '<input type="checkbox" class="cbInline" id="cb1" name="cb1" data-op="onDlgPasteSourceCB" data-id="1" value="Inline"' +
+    (tb.options.wtplusSourceInline ? " checked" : "") +
+    '><label for="cb1"> Inline citation</label><br>' +
     '<label for="resultFld">Citation to add:</label><br>' +
     '<textarea class="resultFld" rows="5" cols="80"></textarea>' +
     '<div style="text-align:right">' +
@@ -1226,14 +1283,18 @@ function posToOffset(txt, pos) {
 }
 */
 export function wtPlus(params) {
-  if (tb.elText.style.display == "none") {
-    alert("Enhanced editor is not supported.\n\nTurning it off to use the extension.");
-    tb.elEnhanced.click();
+  if (params.action !== 'AddCIBCategory') {
+    if (tb.elText.style.display == "none") {
+      alert("Enhanced editor is not supported.\n\nTurning it off to use the extension.");
+      tb.elEnhanced.click();
+      console.log( 'wt+')    
+    }
   }
 
   //Sets all edit variables
   tb.elEnhancedActive = tb.elText.style.display == "none";
   if (tb.elEnhancedActive) {
+    console.log( 'wt+ temp Off')    
     tb.elEnhanced.click();
 
     //            alert ('Enhanced editor is not supported.<br>Turn it off to use WikiTree+ extension.');
@@ -1256,6 +1317,7 @@ export function wtPlus(params) {
   }
   if (tb.elEnhancedActive) {
     tb.elEnhanced.click();
+    console.log( 'wt+ temp On')    
   }
 
   tb.textBefore = tb.textAll.substring(0, tb.selStart);
@@ -1385,22 +1447,24 @@ const attachEvents = (selector, eventType) => {
   document.querySelectorAll(selector).forEach((i) => i.addEventListener(eventType, (event) => mainEventLoop(event)));
 };
 function mainEventLoop(event) {
-  if (tb.elText.style.display == "none") {
-    alert("Enhanced editor is not supported.\n\nTurning it off to use the extension.");
-    tb.elEnhanced.click();
-  }
-
   let element = event.srcElement;
   if (element.tagName == "TD") {
-    element = element.parentElement;
+    if (!element.dataset.op) element = element.parentElement;
   }
   const op = element.dataset.op;
   const id = element.dataset.id;
+  if (!op.startsWith('onDlgSelectCIB')) {
+    if (tb.elText.style.display == "none") {
+      alert("Enhanced editor is not supported.\n\nTurning it off to use the extension.");
+      console.log( 'Main')    
+      tb.elEnhanced.click();
+    }
+  }
+
   if (op === "wtPlus") {
     event.preventDefault();
     return wtPlus(id);
   }
-
   if (op === "onDlgEditTemplateExpCol") {
     event.preventDefault();
     return onDlgEditTemplateExpCol(id);
@@ -1459,6 +1523,10 @@ function mainEventLoop(event) {
 
 function initWTPlus() {
   /* Initialization */
+  getFeatureOptions("wtplus").then((result) => {
+    tb.options = result;
+    console.log(tb.options);
+  });
   tb.nameSpace = document.title.startsWith("Edit Person ") ? "Profile" : "";
   let w = document.querySelector("h1 > .copyWidget");
   if (w) {
@@ -1471,8 +1539,10 @@ function initWTPlus() {
   tb.elSummary = document.getElementById("wpSummary");
   tb.elEnhanced = document.getElementById("toggleMarkupColor");
 
-  document.getElementById("toolbar").insertAdjacentHTML("beforeend", '<dialog id="wtPlusDlg"></dialog>');
+  document.getElementById("toolbar").insertAdjacentHTML("beforeend", '<dialog id="wtPlusDlg"></dialog><dialog id="wtPlusDlgCIB"></dialog>');
   tb.elDlg = document.getElementById("wtPlusDlg");
+  tb.elDlgCIB = document.getElementById("wtPlusDlgCIB");
+  
 
   // Loading of template definition From Storage
   chrome.storage.local.get(["alltemplates"], function (a) {
@@ -1553,7 +1623,7 @@ function initWTPlus() {
         }
         if (tb.dataVersion.getTime() < new Date().getTime() - 6 * 3600 * 1000) {
           // Loading of template definition From Web
-          fetch("https://wikitree.sdms.si/chrome/templatesExp.json")
+          fetch("https://plus.wikitree.com/chrome/templatesExp.json")
             .then((resp) => resp.json())
             .then((jsonData) => {
               const d = new Date(jsonData.version);

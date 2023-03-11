@@ -3,9 +3,7 @@ import $ from "jquery";
 import { features, OptionType } from "./core/options/options_registry";
 import "./features/register_feature_options";
 
-$("h1").prepend(
-  $("<img src='" + chrome.runtime.getURL("images/wikitree-small.png") + "'>")
-);
+$("h1").prepend($("<img src='" + chrome.runtime.getURL("images/wikitree-small.png") + "'>"));
 
 // Categories
 const categories = ["Global", "Profile", "Editing", "Style"];
@@ -31,19 +29,14 @@ function fillOptionsDataFromUiElements(feature, options, optionsData) {
       const fullOptionElementId = optionElementIdPrefix + option.id;
       let element = document.getElementById(fullOptionElementId);
       if (!element) {
-        console.log(
-          "fillOptionsDataFromUiElements: no element found with id: " +
-            fullOptionElementId
-        );
+        console.log("fillOptionsDataFromUiElements: no element found with id: " + fullOptionElementId);
         continue;
       }
 
       if (option.type == OptionType.CHECKBOX) {
         optionsData[option.id] = element.checked;
       } else if (option.type == OptionType.RADIO) {
-        optionsData[option.id] = element.querySelector(
-          `input[name="${fullOptionElementId}"]:checked`
-        ).value;
+        optionsData[option.id] = element.querySelector(`input[name="${fullOptionElementId}"]:checked`).value;
       } else {
         optionsData[option.id] = element.value;
       }
@@ -64,10 +57,7 @@ function setUiElementsFromOptionsData(feature, options, optionsData) {
       const fullOptionElementId = optionElementIdPrefix + option.id;
       let element = document.getElementById(fullOptionElementId);
       if (!element) {
-        console.log(
-          "setUiElementsFromOptionsData: no element found with id: " +
-            fullOptionElementId
-        );
+        console.log("setUiElementsFromOptionsData: no element found with id: " + fullOptionElementId);
         console.log("option.type is : " + option.type);
         continue;
       }
@@ -79,9 +69,7 @@ function setUiElementsFromOptionsData(feature, options, optionsData) {
       if (option.type == OptionType.CHECKBOX) {
         element.checked = optionsData[option.id];
       } else if (option.type == OptionType.RADIO) {
-        element.querySelector(
-          `input[value="${optionsData[option.id]}"]`
-        ).checked = true;
+        element.querySelector(`input[value="${optionsData[option.id]}"]`).checked = true;
       } else {
         element.value = optionsData[option.id];
       }
@@ -134,6 +122,12 @@ function saveFeatureOnOffOptions() {
     console.log("Saving feature " + feature.id + ", checked is: " + checked);
 
     itemsToSave[feature.id] = checked;
+
+    console.log(window.categorySwitchClicked);
+
+    if (window.categorySwitchClicked == false || !window.categorySwitchClicked) {
+      setCategorySwitches();
+    }
   });
 
   chrome.storage.sync.set(itemsToSave);
@@ -145,8 +139,20 @@ function restore_options() {
     features.forEach((feature) => {
       let featureEnabled = items[feature.id];
       if (featureEnabled === undefined) {
-        featureEnabled = (feature.defaultValue) ? true : false;
+        featureEnabled = feature.defaultValue ? true : false;
       }
+      $(`#${feature.id} input`).prop("checked", featureEnabled);
+      restoreFeatureOptions(feature, items);
+    });
+  });
+}
+
+// reads all options from storage and restores state of options page
+function restore_defaults() {
+  chrome.storage.sync.get(null, (items) => {
+    features.forEach((feature) => {
+      let featureEnabled = items[feature.id];
+      featureEnabled = feature.defaultValue ? true : false;
       $(`#${feature.id} input`).prop("checked", featureEnabled);
       restoreFeatureOptions(feature, items);
     });
@@ -308,6 +314,9 @@ function addOptionsForFeature(featureData, optionsContainerElement, options) {
 // when the options page loads, load status of options from storage into the UI elements
 $(document).ready(() => {
   restore_options();
+  setTimeout(function () {
+    setCategorySwitches();
+  }, 2000);
 });
 
 // Sort features alphabetically
@@ -331,40 +340,71 @@ categories.forEach(function (category) {
   });
 });
 
+function setCategorySwitches() {
+  let allTheseSwitches;
+  categories.forEach(function (category) {
+    allTheseSwitches = $(".feature-information." + category + " .switch input");
+    let categorySwitchState = true;
+    allTheseSwitches.each(function () {
+      if ($(this).prop("checked") == false) {
+        categorySwitchState = false;
+      }
+    });
+    window.setCategorySwitches = true;
+    $("h2[data-category=" + category + "] input").prop("checked", categorySwitchState);
+    window.setCategorySwitches = false;
+  });
+}
 // Category switches
-$("h2 input").change(function () {
-  let oSwitch = true;
-  if ($(this).prop("checked") == false) {
-    oSwitch = false;
+$("h2 input").on("change", function () {
+  if (window.setCategorySwitches == false || !window.setCategorySwitches) {
+    window.categorySwitchClicked = true;
+    console.log(window.categorySwitchClicked);
+    let oSwitch = true;
+    if ($(this).prop("checked") == false) {
+      oSwitch = false;
+    }
+    let oClass = $(this).closest("h2").data("category");
+    $("." + oClass)
+      .find("input")
+      .prop("checked", oSwitch);
   }
-  let oClass = $(this).closest("h2").data("category");
-  $("." + oClass)
-    .find("input")
-    .prop("checked", oSwitch);
+  window.setCategorySwitches = false;
+  setTimeout(function () {
+    window.categorySwitchClicked = false;
+  }, 3000);
 });
 
 // Switch at the top to toggle every switch
+
 $("h1").append(
   $(`<div class="feature-toggle">
-<label class="switch">
-<input type="checkbox">
+  All <label class="switch">
+<input type="checkbox" id="toggleAll">
 <span class="slider round"></span>
-</label>
-</div>`)
+</label></div><button id="default">Default</button>`)
 );
 
-$("h1 input").change(function () {
+$("#toggleAll").on("change", function () {
+  let darkModeState = $("#darkMode .switch input").prop("checked");
   let oSwitch = true;
   if ($(this).prop("checked") == false) {
     oSwitch = false;
   }
   $("input[type='checkbox']").prop("checked", oSwitch);
+  if (darkModeState == false) {
+    $("#darkMode .switch input").prop("checked", false);
+  }
+});
+
+$("#default").on("click", function () {
+  restore_defaults();
 });
 
 // Auto save the options on click (on 'change' would create lots of events when a big switch is clicked)
 // The short delay is for the changes to happen after the click
 $("#options .feature-toggle input[type='checkbox']").each(function () {
-  $(this).click(function () {
+  $(this).on("click", function () {
     setTimeout(function () {
       saveFeatureOnOffOptions();
     }, 100);
@@ -379,10 +419,10 @@ $(".feature-options-button").on("click", function () {
     let featureId = id.substring(0, index);
     let optionsElementId = `${featureId}_options`;
     if ($(`#${optionsElementId}`).is(":hidden")) {
-      $(`#${optionsElementId}`).show();
+      $(`#${optionsElementId}`).slideDown();
       $(this).text("Hide Options");
     } else {
-      $(`#${optionsElementId}`).hide();
+      $(`#${optionsElementId}`).slideUp();
       $(this).text("Show Options");
     }
   }
@@ -390,29 +430,40 @@ $(".feature-options-button").on("click", function () {
 
 // adds feature HTML to the options page
 function addFeatureToOptionsPage(featureData) {
-  const featureHTML = `
-        <div class="feature-information ${featureData.category}" id="${featureData.id}">
-            <div class="feature-header">
-                <div class="feature-toggle">
-                    <label class="switch">
-                    <input type="checkbox">
-                    <span class="slider round"></span>
-                    </label>
-                </div>
-                <div class="feature-name">
-                  ${featureData.name}
-                </div>
-                <button type="button" class="feature-options-button" id="${featureData.id}_options_button" hidden>
-                  Show options
-                </button>
-            </div>
-            <div class="feature-content">
-              <div class="feature-description">
-                ${featureData.description}
-              </div>
-            </div>
+  let featureHTML = `
+    <div class="feature-information ${featureData.category}" id="${featureData.id}">
+      <div class="feature-header">
+        <div class="feature-header-left">
+          <div class="feature-toggle">
+            <label class="switch">
+              <input type="checkbox">
+              <span class="slider round"></span>
+            </label>
+          </div>
+          <div class="feature-name">
+            ${featureData.name}
+          </div>
+          <button type="button" class="feature-options-button" id="${featureData.id}_options_button" hidden>
+            Show options
+          </button>
         </div>
-    `;
+        <div class="feature-author">`;
+          if (featureData.creators && featureData.creators.length) {
+            featureHTML += `Created by: ` + featureData.creators.map((person) => `<a href="https://www.wikitree.com/wiki/${person.wikitreeid}" target="_blank">${person.name}</a>`).join(", ") + `.`;
+          }
+          if (featureData.contributors && featureData.contributors.length) {
+            featureHTML += `<br>Contributors: ` + featureData.contributors.map((person) => `<a href="https://www.wikitree.com/wiki/${person.wikitreeid}" target="_blank">${person.name}</a>`).join(", ") + `.`;
+          }
+          featureHTML += `
+        </div>
+      </div>
+      <div class="feature-content">
+        <div class="feature-description">
+          ${featureData.description}
+        </div>
+      </div>
+    </div>
+  `;
 
   $("#features").append(featureHTML);
 
@@ -430,4 +481,70 @@ function addFeatureToOptionsPage(featureData) {
 
     addOptionsForFeature(featureData, optionsElement, featureData.options);
   }
+}
+
+chrome.storage.onChanged.addListener(function () {
+  restore_options();
+});
+
+function addBackupButtons() {
+  chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+    if (tabs[0].url) {
+      if (tabs[0].url.match("wikitree.com")) {
+        $("body").append(
+          $(`<div id="backup"><h2>Back up</h2>
+    <div class="feature-information">
+    Back up	"My Menu", "Change Summary Options", "Clipboard and Notes", and "Extra Watchlist".
+      <div id="backupButtons">
+        <button id="backupButton">Back up</button>
+        <button id="restoreBackupButton">Restore</button>
+      </div>
+    </div>
+  </div>`)
+        );
+        $("#backupButton").on("click", function () {
+          backup();
+        });
+        $("#restoreBackupButton").on("click", function () {
+          restoreBackup();
+        });
+      }
+    }
+  });
+}
+addBackupButtons();
+
+function backup() {
+  chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+    chrome.tabs.sendMessage(tabs[0].id, { greeting: "backup" }, function (response) {
+      console.log(response.farewell);
+    });
+  });
+}
+
+function restoreBackup() {
+  var fileChooser = document.createElement("input");
+  fileChooser.type = "file";
+  fileChooser.addEventListener("change", function () {
+    var file = fileChooser.files[0];
+    var reader = new FileReader();
+    let data;
+    reader.onload = function () {
+      let data = reader.result;
+    };
+    reader.readAsText(file);
+    setTimeout(function () {
+      data = JSON.parse(reader.result);
+      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+        chrome.tabs.sendMessage(tabs[0].id, { greeting: "restoreBackup", data: data }, function (response) {
+          console.log(response.farewell);
+        });
+      });
+    }, 1000);
+    form.reset();
+  });
+  /* Wrap it in a form for resetting */
+  var form = document.createElement("form");
+  form.appendChild(fileChooser);
+  fileChooser.click();
 }

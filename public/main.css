@@ -7,6 +7,15 @@ h6 {
   color: #333333;
 }
 
+html,
+body,
+h1 {
+  margin: 0;
+}
+html {
+  min-width: 780px;
+}
+
 /* Options page */
 .feature-information {
   display: flex;
@@ -17,6 +26,10 @@ h6 {
 .feature-header {
   display: flex;
   flex-direction: row;
+  justify-content: space-between;
+}
+.feature-header-left{
+  display: flex;
 }
 .feature-name {
   color: #333;
@@ -24,6 +37,9 @@ h6 {
   display: flex;
   align-items: center;
   padding-left: 10px;
+}
+.feature-author {
+  align-items: right;
 }
 .feature-description {
   padding: 10px 0 0 70px;
@@ -33,7 +49,8 @@ h6 {
   padding: 10px 0 0 70px;
   font-size: medium;
 }
-.feature-options-button {
+.feature-options-button,
+#options #backup button {
   border-radius: 34px;
   background-color: #8fc641;
   font-size: medium;
@@ -153,6 +170,41 @@ input:checked + .slider:before {
   position: fixed;
   top: 1em;
   right: 1em;
+}
+
+#options #backup {
+  font-size: medium;
+  margin-bottom: 1em;
+}
+#options #backup h2 {
+  font-size: 1.5em;
+}
+#options #backup button {
+  display: inline-block;
+}
+#options #backupButtons {
+  display: block;
+  margin: 1em auto;
+}
+#options #backup button:active {
+  border: 2px solid gray;
+}
+
+h1 .feature-toggle {
+  margin-left: 0.5em;
+}
+h1 #default {
+  float: right;
+  position: relative;
+  display: inline-block;
+  width: 60px;
+  height: 34px;
+  border-radius: 34px;
+  border: 0;
+  font-weight: bold;
+}
+h1 #default:active {
+  box-shadow: 0;
 }
 
 /* content */

@@ -1,13 +1,16 @@
+/*
+Created By: Ian Beacall (Beacall-6)
+*/
+
 import $ from "jquery";
 import Cookies from "js-cookie";
-import "./appsMenu.css";
 import { checkIfFeatureEnabled } from "../../core/options/options_storage";
 
 checkIfFeatureEnabled("appsMenu").then((result) => {
   if (result) {
-    // Add a menu if WikiTree BEE hasn't already done so.
     if ($("#appsSubMenu").length == 0) {
       attachAppsMenu();
+      import("./appsMenu.css");
     }
   }
 });
@@ -47,7 +50,7 @@ function attachAppsMenu() {
     { title: "Surnames Generator", URL: "https://apps.wikitree.com/apps/clarke11007/surnames.php" },
     { title: "Swedish Reference Creation Tools", URL: "https://apps.wikitree.com/apps/lundholm24/ref-making" },
     { title: "Topola Genealogy Viewer", URL: "https://apps.wikitree.com/apps/wiech13/topola-viewer/" },
-    { title: "WikiTree+", URL: "https://wikitree.sdms.si/default.htm" },
+    { title: "WikiTree+", URL: "https://plus.wikitree.com/default.htm" },
     { title: "WikiTree BEE", URL: "https://www.wikitree.com/index.php?title=Space:WikiTree_BEE" },
     {
       title: "WikiTree Browser Extension",
