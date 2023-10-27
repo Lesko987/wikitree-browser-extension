@@ -1,16 +1,26 @@
 /*
-Created By: Ian Beacall (Beacall-6)
+Created By: Ian Beacall (Beacall-6), Aleš Trtnik (Trtnik-2)
 */
 
 import $ from "jquery";
 import { copyThingToClipboard } from "../g2g/g2g";
-import { checkIfFeatureEnabled, getFeatureOptions } from "../../core/options/options_storage";
+import { shouldInitializeFeature, getFeatureOptions } from "../../core/options/options_storage";
+import {
+  isMediaWikiPage,
+  isProfileHistoryDetail,
+  isProfilePage,
+  isProfileEdit,
+  isSpaceEdit,
+  isSpacePage,
+  isCategoryPage,
+  isTemplatePage,
+  isProjectPage,
+  isNetworkFeed,
+  isCategoryEdit,
+} from "../../core/pageType";
 
-checkIfFeatureEnabled("scissors").then((result) => {
-  if (
-    result &&
-    $("body.page-Special_EditFamilySteps,body.page-Special_EditFamily,body.page-Special_EditPerson").length == 0
-  ) {
+shouldInitializeFeature("scissors").then((result) => {
+  if (result) {
     import("./scissors.css");
     if ($("#helpScissors").length == 0) {
       helpScissors();
@@ -18,73 +28,144 @@ checkIfFeatureEnabled("scissors").then((result) => {
   }
 });
 
-function helpScissors() {
-  const url = decodeURIComponent(window.location.href);
-  const pageTitle = $("h1").text().trim();
-  if (window.location.href.match(/\wiki\/Help:|Category:|Project:|Template:/)) {
-    const helpIDmatch = url.match(/(Help|Category|Project|Template).*/)[0];
-    let helpLink = "[" + url + " " + helpIDmatch + "]";
-    const categoryIDmatch = url.match(/Category.*/);
-    if (categoryIDmatch != null) {
-      helpLink = "[[:" + helpIDmatch + "]]";
+async function helpScissors() {
+  const options = await getFeatureOptions("scissors");
+  let copyItems = [];
+  let copyPosition = $("h1");
+
+  // Network feed
+  if (isNetworkFeed || isProfileHistoryDetail) {
+    const urlParams = new URLSearchParams(window.location.search);
+    let feedID = urlParams.get("who");
+    if (isProfileHistoryDetail) {
+      feedID = urlParams.get("title");
+    }
+    const feedURL = window.location.href;
+    let feedTitle = $("h1").text();
+    const feedName = $('span.HISTORY-ITEM a[href*="wiki/' + feedID + '"')
+      .eq(0)
+      .text();
+    if (isProfileHistoryDetail) {
+      feedTitle = "Change Details of " + feedName;
     }
 
-    if (helpIDmatch != null) {
-      window.helpID = helpIDmatch[0];
-      $("h1").append(
-        $(
-          '<span id="helpScissors"><button aria-label="Copy ID" title="Copy ID" data-copy-label="Copy ID" class="copyWidget" data-copy-text="' +
-            helpID +
-            '" style="color:#8fc641;"><img src="/images/icons/scissors.png">ID</button><button aria-label="Copy Link" title="Copy Link" data-copy-label="Copy Link" class="copyWidget" data-copy-text="' +
-            helpLink +
-            '" style="color:#8fc641;">/Link</button><button aria-label="Copy URL" title="Copy URL" data-copy-label="Copy URL" class="copyWidget" data-copy-text="' +
-            url +
-            '" style="color:#8fc641;">/URL</button></span><button aria-label="Copy Title" id="copyTitle" title="Copy Title" data-copy-label="Copy Title" class="copyWidget" data-copy-text="' +
-            pageTitle +
-            '" style="color:#8fc641;">/Title</button></span>'
-        )
-      );
+    copyItems.push({ label: "ID", text: feedID, image: true });
+    copyItems.push({ label: "Link", text: `[[${feedID}|${feedName}]]` });
+    copyItems.push({ label: "Title", text: feedTitle });
+    copyItems.push({ label: "URL", text: feedURL });
 
-      $("#helpScissors button").on("click", function (e) {
-        e.preventDefault();
-        copyThingToClipboard($(this).attr("data-copy-text"));
-      });
+    // Profiles change details page
+    if (isProfileHistoryDetail) {
+      const historyItem = $("span.HISTORY-ITEM");
+      const theAct = historyItem.find("a:contains(created),a:contains(imported the data)");
+      const createDetail = theAct.length ? ` at creation of WikiTree profile ${theAct[0].title}` : "";
+      const fromGedcom = theAct.length ? historyItem.find('a[title*="UploadGedcom"]') : undefined;
+      const changesMadeBy = $("td:contains(Changes made by)");
+      const theDate = changesMadeBy.text().match(/[0-9]+ [A-Z][a-z]+ [0-9]{4}/);
+      const adderA = changesMadeBy.find("a").eq(0);
+      const adderID = adderA.attr("href").split("wiki/")[1];
+      const adderName = adderA.text();
+      const url = decodeURIComponent(window.location.href);
+      let reference = `[${url} Added]${createDetail} by [[${adderID}|${adderName}]]`;
+      if (fromGedcom && fromGedcom.length) {
+        reference += ` through the import of ${fromGedcom.text()}`;
+      }
+      if (theDate) {
+        reference += " on " + theDate + ".";
+      } else {
+        reference += ".";
+      }
+      copyItems.push({ label: "Reference", text: reference });
     }
   }
-  if (url.match("Space:")) {
-    $("h1").append(
-      '<button aria-label="Copy Title" id="copyTitle" title="Copy Title" data-copy-label="Copy Title" class="copyWidget" data-copy-text="' +
-        pageTitle.replace("ID/Link/URL", "").trim() +
-        '" style="color:#8fc641;">/Title</button></span>'
+
+  // MediaWiki pages
+  if (isMediaWikiPage) {
+    let aTitle = "";
+    if (isProjectPage) {
+      aTitle = "Project:" + document.title.replace(" Project", "");
+    } else {
+      aTitle = document.title;
+    }
+    copyItems.push({ label: "ID", text: aTitle, image: true });
+    let aLink = "";
+    if (isCategoryPage) {
+      if (options.categoryLinkFormat == "withParameter") {
+        aTitle = aTitle + "|" + document.title.replace("Category:", "").trim() + " category";
+      }
+      aLink = `[[:${aTitle}]]`;
+    } else if (isTemplatePage) {
+      aLink = `{{${aTitle}}}`;
+    } else {
+      aLink = `[[${aTitle}]]`;
+    }
+    copyItems.push({ label: "Link", text: aLink });
+    const aUrl = window.location.href;
+    copyItems.push({ label: "URL", text: aUrl });
+  }
+
+  if (isCategoryPage || isCategoryEdit) {
+    const aTitle = document.title.trim();
+    const aLink = `[[${aTitle}]]`;
+    copyItems.push({ label: "Use", text: aLink });
+  }
+
+  // Space page
+  if (isSpacePage || isSpaceEdit) {
+    const aTitle = document.title.replace("Editing ", "");
+    copyItems.push({ label: "Title", text: aTitle });
+  }
+
+  // Profile page
+  if (isProfilePage || isProfileEdit) {
+    const userID = $("#pageData").attr("data-mid");
+    copyItems.push({ label: "UserID", text: userID });
+    if (options.removeDates) {
+      const dateless = $("button[aria-label='Copy Wiki Link']")
+        .data("copy-text")
+        .replace(/ \(.*[0-9]{4}.*\)/, "");
+      $("button[aria-label='Copy Wiki Link']").data("copy-text", dateless).attr("data-copy-text", dateless);
+    }
+  }
+
+  // Space page
+  if ((isSpacePage || isSpaceEdit) && options.spaceLinkFormat != "withParameter") {
+    const button = $("button[aria-label='Copy Wiki Link']");
+    const aTitle = document.title.trim();
+    const noParameter = "[[:Space: " + aTitle + "]]";
+    button.data("copy-text", noParameter).attr("data-copy-text", noParameter);
+  }
+
+  // Adds items and event
+  if (copyItems && copyItems.length != 0) {
+    copyPosition.append(
+      $(
+        copyItems
+          .map((item) => {
+            let x = `<button aria-label="Copy ${item.label}" title="${item.text}" data-copy-label="Copy ${item.label}" class="copyWidget helpScissors" data-copy-text="${item.text}" style="color:#8fc641;">`;
+            if (item.image) {
+              x += '<img src="/images/icons/scissors.png">' + item.label + "</button>";
+            } else {
+              x += "/" + item.label + "</button>";
+            }
+            return x;
+          })
+          .join("")
+      )
     );
-    $("#copyName").on("click", function (e) {
-      e.preventDefault();
-      copyThingToClipboard($(this).attr("data-copy-text"));
-    });
-  }
-  if ($("h1:contains('Change Details')").length || $("h1:contains('Creation of Profile')").length) {
-    const historyItem = $("span.HISTORY-ITEM");
-    let change = "Added";
-    if (historyItem.find("a:contains(created),a:contains(imported the data)").length) {
-      change = "Created";
-    }
-    const changesMadeBy = $("td:contains(Changes made by)");
-    const theDate = changesMadeBy.text().match(/[0-9]+ [A-Z][a-z]+ [0-9]{4}/);
-    let adderA = changesMadeBy.find("a").eq(0);
-    let adderID = adderA.attr("href").split("wiki/")[1];
-    let adderName = adderA.text();
-    let reference = "[" + url + " " + change + "] by [[" + adderID + "|" + adderName + "]] on " + theDate + ".";
-    adderA
-      .parent()
-      .append(
-        $(
-          '<span id="helpScissors"><button aria-label="Copy Reference" title="Copy reference to your clipboard" data-copy-label="Copy Reference" class="copyWidget" data-copy-text="' +
-            reference +
-            '" style="color:#8fc641;"><img src="/images/icons/scissors.png">Reference</button></span>'
-        )
-      );
 
-    $("#helpScissors button").on("click", function (e) {
+    // Remove the space before "UserID"
+    const copyID = document.querySelector('.copyWidget[aria-label="Copy UserID"]');
+    if (copyID) {
+      let previousSibling = copyID.previousSibling;
+      while (previousSibling && previousSibling.nodeType === 3 && /^\s*$/.test(previousSibling.nodeValue)) {
+        var toRemove = previousSibling;
+        previousSibling = previousSibling.previousSibling;
+        toRemove.parentNode.removeChild(toRemove);
+      }
+    }
+
+    $("helpScissors").on("click", function (e) {
       e.preventDefault();
       copyThingToClipboard($(this).attr("data-copy-text"));
     });

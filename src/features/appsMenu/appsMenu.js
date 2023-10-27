@@ -3,10 +3,10 @@ Created By: Ian Beacall (Beacall-6)
 */
 
 import $ from "jquery";
-import Cookies from "js-cookie";
-import { checkIfFeatureEnabled } from "../../core/options/options_storage";
+import Cookies from "js-cookie"; 
+import { shouldInitializeFeature } from "../../core/options/options_storage";
 
-checkIfFeatureEnabled("appsMenu").then((result) => {
+shouldInitializeFeature("appsMenu").then((result) => {
   if (result) {
     if ($("#appsSubMenu").length == 0) {
       attachAppsMenu();
@@ -28,14 +28,11 @@ function attachAppsMenu() {
       title: "Bio Check",
       URL: "https://apps.wikitree.com/apps/sands1865/biocheck/?action=checkProfile&profileId=profileID",
     },
-    { title: "Brick Walls", URL: "https://apps.wikitree.com/apps/nelson3486/brickwalls/" },
     { title: "Check Stickers", URL: "https://apps.wikitree.com/apps/anderson23510/stickers/" },
     { title: "Cemetery Mapping", URL: "https://apps.wikitree.com/apps/harris5439/cemeteries/" },
-    { title: "CC7 Table", URL: "https://apps.wikitree.com/apps/beacall6/cc7_table.php?id=mWTID" },
     { title: "DNA Confirmation Citation Maker", URL: "https://apps.wikitree.com/apps/clarke11007/DNAconf.php" },
     { title: "Family Group App", URL: "https://apps.wikitree.com/apps/beacall6/familySheet.php" },
     { title: "FamilySearch Matches", URL: "https://apps.wikitree.com/apps/york1423/fs-match" },
-    { title: "Fan Chart", URL: "https://apps.wikitree.com/apps/clarke11007/fan.php" },
     { title: "Feeds -> Excel", URL: "https://apps.wikitree.com/apps/beacall6/contributions.php" },
     {
       title: "Genealogietools.nl",
@@ -57,7 +54,6 @@ function attachAppsMenu() {
       URL: "https://www.wikitree.com/index.php?title=Space:WikiTree_Browser_Extension",
     },
     { title: "WikiTree Sourcer", URL: "https://www.wikitree.com/wiki/Space:WikiTree_Sourcer" },
-    { title: "WikiTree X", URL: "https://www.wikitree.com/wiki/Help:WikiTree_X" },
   ];
   theMenu.forEach(function (app) {
     const appsLi = $(

@@ -7,11 +7,11 @@ import Cookies from "js-cookie";
 import "jquery-ui/ui/widgets/draggable";
 import "../../thirdparty/date.format.js";
 import "./extra_watchlist.css";
-import { isOK, htmlEntities, displayName } from "../../core/common";
+import { isOK, htmlEntities } from "../../core/common";
 import { appendClipboardButtons } from "../clipboard_and_notes/clipboard_and_notes";
-import { checkIfFeatureEnabled, getFeatureOptions } from "../../core/options/options_storage";
+import { shouldInitializeFeature, getFeatureOptions } from "../../core/options/options_storage";
 
-checkIfFeatureEnabled("extraWatchlist").then((result) => {
+shouldInitializeFeature("extraWatchlist").then((result) => {
   if (
     result &&
     $("body.page-Special_EditFamily,body.page-Special_EditPerson,body.page-Special_EditFamilySteps").length == 0
@@ -19,6 +19,10 @@ checkIfFeatureEnabled("extraWatchlist").then((result) => {
     extraWatchlist();
   }
 });
+
+const favoritePlusOn = chrome.runtime.getURL("images/favorite-plus-on.png");
+const favoritePlusWhite = chrome.runtime.getURL("images/favorite-plus-white.png");
+const binocularsURL = chrome.runtime.getURL("images/binoculars.png");
 
 function getThisID() {
   let spaceMatch = window.location.href.match(/Space:.*$/);
@@ -48,11 +52,11 @@ function strDate() {
 window.textFile = null;
 const makeTextFile = function (text) {
   var data = new Blob([text], { type: "text/plain" });
-  if (textFile !== null) {
-    window.URL.revokeObjectURL(textFile);
+  if (window.textFile !== null) {
+    window.URL.revokeObjectURL(window.textFile);
   }
-  textFile = window.URL.createObjectURL(data);
-  return textFile;
+  window.textFile = window.URL.createObjectURL(data);
+  return window.textFile;
 };
 
 function sortTouched(order = "touched") {
@@ -79,11 +83,9 @@ function sortTouched(order = "touched") {
   if (order == "name") {
     secondarySort(items, "lnab", "firstname", 1);
   }
-  const myDate = new Date();
 }
 
 function recentChange(person) {
-  console.log(person);
   $("#ewlEmpty").hide();
   let pt = false;
   let ptOut = "";
@@ -228,7 +230,12 @@ async function get_Profile(id) {
       xhrFields: { withCredentials: true },
       type: "POST",
       dataType: "json",
-      data: { action: "getProfile", key: id, fields: "*" },
+      data: {
+        action: "getProfile",
+        key: id,
+        fields: "*",
+        appId: "WBE_extra_watchlist",
+      },
     });
     return result;
   } catch (error) {
@@ -266,6 +273,7 @@ async function getPeople(
         bioFormat: bioFormat,
         fields: fields,
         resolveRedirect: 1,
+        appId: "WBE_extra_watchlist",
       },
     });
     return result;
@@ -342,7 +350,7 @@ function doExtraWatchlist() {
 
       bits.forEach(function (aKey) {
         if (aKey.match("Space:")) {
-          get_Profile(aKey).then((person) => {
+          get_Profile(decodeURIComponent(aKey)).then((person) => {
             addToExtraWatchlist(person[0]);
           });
         }
@@ -368,20 +376,24 @@ async function extraWatchlist() {
     imageColour = "on";
     titleText = "Remove from your Extra Watchlist";
   }
+  let plusImageURL = favoritePlusWhite;
+  if (imageColour == "on") {
+    plusImageURL = favoritePlusOn;
+  }
+
   const plusImage = $(
     "<img id='addToExtraWatchlistButton' class='button small extraWatchlistButton' title='" +
       titleText +
       "' src='" +
-      chrome.runtime.getURL("images/favorite-plus-" + imageColour + ".png") +
+      plusImageURL +
       "'>"
   );
   const binocularsImage = $(
     "<img id='viewExtraWatchlist' class='button small extraWatchlistButton' title='See your Extra Watchlist' src='" +
-      chrome.runtime.getURL("images/binoculars.png") +
+      binocularsURL +
       "'>"
   );
-  if ($("span.theClipboardButtons").length) {
-  } else {
+  if ($("span.theClipboardButtons").length == 0) {
     const clipboardButtons = $("<span class='theClipboardButtons'></span>");
     appendClipboardButtons(clipboardButtons);
   }
@@ -394,8 +406,14 @@ async function extraWatchlist() {
     e.preventDefault();
 
     if ($("#extraWatchlistWindow").length == 0) {
+      const mouseY = e.pageY;
       const eww = $("<div id='extraWatchlistWindow' class='ui-widget-content'></div>");
       eww.insertAfter($("#views-wrap"));
+      eww.css({
+        position: "absolute",
+        top: mouseY,
+        // left: mouseX,
+      });
       if ($("body.profile").length == 0) {
         eww.insertAfter($("#header,.qa-header"));
       }
@@ -488,7 +506,7 @@ async function extraWatchlist() {
     if (localStorage.extraWatchlist.match(thisID + "@")) {
       $("#addToExtraWatchlistButton").addClass("onList");
       $("#addToExtraWatchlistButton").attr("title", "On your Extra Watchlist (click to remove)");
-      $("#addToExtraWatchlistButton").prop("src", chrome.runtime.getURL("images/favorite-plus-on.png"));
+      $("#addToExtraWatchlistButton").prop("src", favoritePlusOn);
     }
   }
 
@@ -507,13 +525,13 @@ async function extraWatchlist() {
       $("#touchedList tr[data-id='" + str + "']").remove();
       $("#addToExtraWatchlistButton").attr("title", "Add to your Extra Watchlist");
       $("#addToExtraWatchlistButton").removeClass("onList");
-      $("#addToExtraWatchlistButton").prop("src", chrome.runtime.getURL("images/favorite-plus-white.png"));
+      $("#addToExtraWatchlistButton").prop("src", favoritePlusWhite);
     } else {
       const oExtraWatchlist = localStorage.extraWatchlist;
       localStorage.setItem("extraWatchlist", oExtraWatchlist + str + "@");
       $("#addToExtraWatchlistButton").addClass("onList");
       $("#addToExtraWatchlistButton").attr("title", "On your Extra Watchlist (Click to remove)");
-      $("#addToExtraWatchlistButton").prop("src", chrome.runtime.getURL("images/favorite-plus-on.png"));
+      $("#addToExtraWatchlistButton").prop("src", favoritePlusOn);
     }
     if ($("#extraWatchlistWindow").is(":visible") && theChange == "add") {
       get_Profile(thisID).then((response) => {
@@ -523,7 +541,7 @@ async function extraWatchlist() {
   });
 }
 
-function secondarySort(rows, dataThing1, dataThing2, isText = 0) {
+export function secondarySort(rows, dataThing1, dataThing2, isText = 0) {
   let lastOne = "Me";
   let tempArr = [lastOne];
   rows.each(function (index) {

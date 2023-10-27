@@ -1,0 +1,326 @@
+/* Options page */
+.category-root {
+  margin-top: 20px;
+}
+.section {
+  position: relative;
+}
+.category-root > .section .section {
+  padding-top: 10px;
+  padding-bottom: 8px;
+}
+.section-content > .section > .section-content {
+  padding-left: 4em;
+}
+.section-description {
+  font-size: 13px;
+  margin-left: 22px;
+}
+.section.category > .section-header > .section-description {
+  margin-left: 60px;
+}
+.category-root > .section > .section-header > .section-description {
+  display: inline-block;
+  margin-left: 10px;
+  font-size: 14px;
+}
+
+.feature-author {
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  padding: 3px 5px;
+  text-align: right;
+  color: #999;
+}
+.feature-author > div {
+  font-size: 12px;
+  line-height: 14px;
+}
+.feature-help-link {
+  display: inline-block;
+  margin-left: 5px;
+}
+.feature-options {
+  font-size: 16px;
+}
+div.feature-options {
+  padding-top: 10px;
+}
+.feature-options-button {
+  position: relative;
+  left: 20px;
+  top: -3px;
+  background-color: #ddd;
+  border-radius: 34px;
+  font-size: 14px;
+  padding: 6px 17px;
+  min-width: 120px;
+  border: 0;
+  cursor: pointer;
+}
+.feature-options-button:hover {
+  background-color: #8fc641;
+}
+.section:not(.feature-enabled) > .section-content > div.feature-options::before,
+.section:not(.feature-enabled) > .section-content > dialog.feature-options > .dialog-content::before {
+  display: table;
+  content: "This feature must be toggled on for these options to take effect.";
+  border: 3px solid #fbb616;
+  font-size: 14px;
+  font-style: italic;
+  font-weight: bold;
+  padding: 0.5em;
+  border-radius: 1em;
+  margin-bottom: 0.5em;
+}
+
+/* Option elements */
+.option-subheading {
+  font-size: 16px;
+  font-weight: bold;
+  margin-top: 10px;
+  margin-bottom: 2px;
+}
+.option-subcontainer {
+  margin-left: 20px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+.option-text-line {
+  font-size: 16px;
+  font-style: italic;
+  margin: 2px;
+}
+.option-checkbox {
+  margin: 4px 0;
+}
+.option-select {
+  margin: 2px;
+}
+.option-number {
+  margin: 2px 0;
+  width: 40px;
+}
+.option-comment {
+  font-style: italic;
+  padding-left: 20px;
+  display: inline-block;
+}
+
+/* Toggle buttons */
+.toggle-category:not(.label-left),
+.toggle-feature {
+  display: inline-block;
+}
+
+.toggle-category.label-left {
+  position: relative;
+  float: right;
+  clear: right;
+}
+h1 .toggle-category {
+  margin-left: 0.5em;
+}
+
+.section-header > .toggle > label {
+  font-weight: 500;
+}
+.category-root > .section > .section-header > .toggle > label {
+  font-weight: 700;
+}
+
+/* Categories */
+.section.category[id] {
+  scroll-margin-top: 90px;
+}
+
+#categoryBar {
+  position: fixed;
+  top: 62px;
+  left: 0;
+  right: 0;
+  background-color: #fff;
+  -webkit-box-shadow: 0 0 6px 2px rgba(0, 0, 0, 0.13);
+  box-shadow: 0 0 6px 2px rgba(0, 0, 0, 0.13);
+  height: 28px;
+  z-index: 99;
+  overflow: hidden;
+}
+#categoryBar > ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  line-height: 32px;
+  text-align: center;
+}
+#categoryBar > ul > li {
+  display: inline-block;
+  margin: 0 1em;
+}
+#categoryBar > ul > li > a {
+  text-decoration: none;
+  padding: 2px 8px;
+  font-weight: 600;
+  color: #060;
+}
+#categoryBar > ul > li:first-child {
+  margin-left: 0;
+}
+#categoryBar > ul > li:last-child {
+  margin-right: 0;
+}
+
+.section-header {
+  position: relative;
+  margin: 0;
+  padding: 0 10px;
+}
+.category-root > .section > .section-header {
+  background: #e1f0b4
+    linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0) 0%,
+      rgba(0, 0, 0, 0.005) 37%,
+      rgba(0, 0, 0, 0.01) 69%,
+      rgba(0, 0, 0, 0.02) 85%,
+      rgba(0, 0, 0, 0.04) 93%,
+      rgba(0, 0, 0, 0.08) 97%,
+      rgba(0, 0, 0, 0.16) 99%,
+      rgba(0, 0, 0, 0.32) 100%
+    );
+  background-size: 100% 30px;
+  background-repeat: repeat-x;
+  padding: 10px 10px;
+  font-size: 24px;
+}
+.category-root > .section > .section-content > .section {
+  background: linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.005) 37%,
+    rgba(0, 0, 0, 0.01) 69%,
+    rgba(0, 0, 0, 0.02) 85%,
+    rgba(0, 0, 0, 0.04) 93%,
+    rgba(0, 0, 0, 0.08) 97%,
+    rgba(0, 0, 0, 0.16) 99%,
+    rgba(0, 0, 0, 0.32) 100%
+  );
+  background-size: 100% 30px;
+  background-repeat: repeat-x;
+}
+
+/* Make the header (h1) sticky */
+#options {
+  position: relative;
+  padding-top: 70px;
+}
+#options h1 {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background-color: #f7f6f0;
+  -webkit-box-shadow: 0 0 6px 2px rgba(0, 0, 0, 0.13);
+  box-shadow: 0 0 6px 2px rgba(0, 0, 0, 0.13);
+  height: 40px;
+  z-index: 100;
+}
+
+/* Page header */
+#options h1 {
+  padding: 0.5em;
+  font-size: 24px;
+}
+#options #h1Text {
+  display: inline-block;
+  color: #25422d;
+  position: absolute;
+  left: 220px;
+  bottom: 15px;
+  font-size: 35px;
+  font-weight: 300;
+  letter-spacing: -3px;
+}
+
+#openSettings {
+  float: right;
+  width: 34px;
+  height: 34px;
+  filter: drop-shadow(0 0 1px #000);
+}
+#openSettings g > rect {
+  fill: #ddd;
+}
+#openSettings > circle {
+  stroke: #ddd;
+}
+#openSettings:hover {
+  cursor: pointer;
+}
+#openSettings:hover g > rect {
+  fill: #fbb616;
+}
+#openSettings:hover > circle {
+  stroke: #fbb616;
+}
+
+/* Settings dialog */
+#settingsDialog {
+  min-height: 100px;
+  max-height: 580px;
+  font-size: 16px;
+}
+#settingsDialog .dialog-version {
+  float: right;
+  margin-top: -5px;
+  margin-right: -5px;
+  font-size: 8pt;
+  color: #999;
+}
+#settingsDialog .dialog-version > a {
+  color: #999;
+  text-decoration: none;
+}
+#settingsDialog ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+#settingsDialog li {
+  margin-top: 10px;
+}
+#settingsDialog li:first-child {
+  margin-top: 0;
+}
+#settingsDialog button,
+#settingsDialog a.button {
+  display: inline-block;
+  background-color: #ddd;
+  color: #000;
+  padding: 0 17px;
+  height: 34px;
+  line-height: 34px;
+  border-radius: 34px;
+  border: 0;
+  font-size: 16px;
+  text-decoration: none;
+}
+#settingsDialog button:hover,
+#settingsDialog a.button:hover {
+  background-color: #8fc641;
+  color: #000;
+  cursor: pointer;
+}
+#settingsDialog button:active,
+#settingsDialog a.button:active {
+  color: #000;
+  box-shadow: 0;
+}
+#settingsDialog a.button.download,
+#settingsDialog a.button.download:active {
+  background-color: #ffe270;
+}
+#settingsDialog a.button.download:hover {
+  background-color: #8fc641;
+}

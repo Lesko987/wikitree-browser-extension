@@ -1,61 +1,104 @@
 /*
 Created By: Ian Beacall (Beacall-6)
+Contributors: Jonathan Duke (Duke-5773)
 */
 
 import $ from "jquery";
-import { checkIfFeatureEnabled, getFeatureOptions } from "../../core/options/options_storage";
+import { shouldInitializeFeature, getFeatureOptions } from "../../core/options/options_storage";
 import { isOK, htmlEntities, displayName } from "../../core/common";
 import { displayDates } from "../verifyID/verifyID";
 import { getRelatives } from "wikitree-js";
 import "./change_family_lists.css";
 
-checkIfFeatureEnabled("changeFamilyLists").then((result) => {
+let options;
+
+shouldInitializeFeature("changeFamilyLists").then(async (result) => {
   const ancestorsButton = $("span.showHideTree").eq(0);
   const descendantsButton = $("span#showHideDescendants");
   if (result) {
+    options = await getFeatureOptions("changeFamilyLists");
     window.excludeValues = ["", null, "null", "0000-00-00", "unknown", "undefined", undefined, NaN, "NaN"];
-    prepareFamilyLists().then(() => {
-      getFeatureOptions("changeFamilyLists").then((options) => {
-        if (options.moveToRight) {
-          moveFamilyLists(true);
-        }
-        if (options.verticalLists) {
-          $("#nVitals").addClass("vertical");
-          reallyMakeFamLists();
-        } else if (options.agesAtMarriages) {
-          onlyAgesAtMarriages();
-        }
-        if (!options.verticalLists) {
-          $("body").addClass("WTEsibHeaders");
-          prepareHeadings();
-          if (options.siblingAndChildCount) {
-            addChildrenCount();
-          }
-        }
-        if (options.changeHeaders) {
-          setTimeout(function () {
-            siblingsHeader(true);
-          }, 1500);
-        }
+    await prepareFamilyLists();
+    if (options.moveToRight) {
+      moveFamilyLists(true);
+    }
+    if (options.showSidebarHeading) {
+      $("html").addClass("x-cfl-show-heading");
+    }
+    if (options.highlightActiveProfile) {
+      $("html").addClass("x-cfl-highlight-active");
+    }
+    if (options.verticalLists) {
+      $("#nVitals").addClass("vertical");
+      reallyMakeFamLists();
+    }
+    if (!options.verticalLists) {
+      $("body").addClass("WTEsibHeaders");
+      prepareHeadings();
+      if (options.siblingAndChildCount) {
+        addChildrenCount();
+      }
+      await getWindowPeople();
+      if (options.agesAtMarriages) {
+        addMarriageAges();
+      }
+      // Find the name from the element
+      // const nameToFind = $("a.pureCssMenui0 span.person").text();
 
-        if (!options.verticalLists) {
-          $("#parentDetails").before(ancestorsButton);
-          $("#childrenDetails").before(descendantsButton);
-        } else {
-          $("#parentDetails").prepend(ancestorsButton);
-          $("#childrenDetails").prepend(descendantsButton);
-        }
-        $("span.showHideTree").eq(1).remove();
-        setTimeout(function () {
-          const openPadlock = $("img[title='Privacy Level: Open']");
-          if (openPadlock.length) {
-            addAddLinksToHeadings();
-          }
-        }, 3000);
+      const parentPerson = window.people?.[0];
+      const oChildren = parentPerson?.Children;
+      let children = [];
+      if (oChildren) {
+        children = Object.values(oChildren);
+      }
 
-        addParentStatus();
-      });
-    });
+      if (parentPerson) {
+        // Get the parent's Id
+        const parentId = parentPerson.Id;
+        // Iterate through the people to find children with the matching parent Id
+        children.forEach((person) => {
+          let addDNAconfirmed = false;
+          if (person.Mother == parentId && person.DataStatus?.Mother == 30) {
+            addDNAconfirmed = true;
+          } else if (person.Father == parentId && person.DataStatus?.Father == 30) {
+            addDNAconfirmed = true;
+          }
+          if (addDNAconfirmed) {
+            $(`.VITALS a[href$="${person.Name}"]`).after(
+              $(
+                `<img class="DNAConfirmed" src="/images/icons/dna/DNA-confirmed.gif" border="0" width="38" height="12" alt="DNA confirmed" title="Confirmed with DNA testing">`
+              )
+            );
+          }
+        });
+      }
+      if (isOK(parentPerson.BirthDate) && (options.parentAges || options.ageDifferences)) {
+        addRelativeAges(parentPerson);
+      }
+    }
+    if (options.changeHeaders) {
+      setTimeout(function () {
+        siblingsHeader(true);
+      }, 3000);
+    }
+
+    if (!options.verticalLists) {
+      $("#parentDetails").before(ancestorsButton);
+      $("#childrenDetails").before(descendantsButton);
+    } else {
+      $("#parentDetails").prepend(ancestorsButton);
+      $("#childrenDetails").prepend(descendantsButton);
+    }
+    $("span.showHideTree").eq(1).remove();
+    setTimeout(function () {
+      const openPadlock = $("img[title='Privacy Level: Open']");
+      if (openPadlock.length) {
+        addAddLinksToHeadings();
+      }
+    }, 3000);
+
+    addParentStatus();
+
     window.onresize = function () {
       if ($("body.profile").length && window.location.href.match("Space:") == null) {
         moveFamilyLists(true);
@@ -82,18 +125,27 @@ async function addAddLinksToHeadings() {
     ["#motherUnknown", "mother"],
   ];
   let whichParent;
+
+  if (!window.people) {
+    const getPeopleResult = await getFamilyPeople();
+    if (getPeopleResult) {
+      window.people = Object.values(getPeopleResult[0].people);
+    }
+  }
+
   if (window.people) {
-    if (!window.people[0] && window.people[0].Father) {
+    if (!window.people?.[0]?.Father) {
       whichParent = "mother";
     }
 
     headings.forEach(function (aHeading) {
       if (
-        ["#siblingsUnknown", "#siblingsHeader"].includes(aHeading[0]) &&
-        window.people[0]?.Mother == 0 &&
-        window.people[0]?.Father == 0
+        !(
+          ["#siblingsUnknown", "#siblingsHeader"].includes(aHeading[0]) &&
+          window.people[0]?.Mother == 0 &&
+          window.people[0]?.Father == 0
+        )
       ) {
-      } else {
         $(aHeading[0])
           .attr("title", "Right click to add a " + aHeading[1])
           .css("cursor", "pointer");
@@ -112,13 +164,24 @@ async function addAddLinksToHeadings() {
 async function prepareFamilyLists() {
   if ($("body.profile").length && window.location.href.match("Space:") == null && $("#nVitals").length == 0) {
     const ourVitals = $("div.ten div.VITALS");
-    const familyLists = $("<div id='nVitals'></div>");
+    const familyLists = $(
+      '<div id="nVitals" style="display: none;">' +
+        '<div class="large sidebar-heading" style="margin-bottom:0.5em"><strong>Family Relationships</strong></div>' +
+        "</div>"
+    );
+
+    ourVitals.last().after(familyLists);
     ourVitals.each(function () {
       if ($(this).find("span[itemprop='givenName']").length) {
         $(this).prop("id", "profileName");
+        if (!options.moveToEnd && !options.moveToRight) {
+          $(this).after(familyLists);
+        }
       } else if ($(this).text().match(/^Born/)) {
         $(this).prop("id", "birthDetails");
-        $(this).after(familyLists);
+        if (!options.moveToEnd && !options.moveToRight) {
+          $(this).after(familyLists);
+        }
       } else if ($(this).text().match(/^Died/)) {
         $(this).prop("id", "deathDetails");
       } else {
@@ -154,24 +217,71 @@ async function prepareFamilyLists() {
       }
     });
 
+    familyLists.show();
     $("#parentDetails").prepend($("span.showHideTree").eq(0));
     $("#childrenDetails").prepend($("span#showHideDescendants"));
   }
 }
 
-async function onlyAgesAtMarriages() {
+async function getWindowPeople() {
   const id = $("a.pureCssMenui0 span.person").text();
-  getRelatives([id], {
-    getSpouses: true,
-    fields: ["*"],
-  }).then((personData) => {
-    window.people = [personData[0]];
-    addMarriageAges();
-  });
+  const aResult = await getRelatives(
+    [id],
+    {
+      getSpouses: true,
+      getChildren: true,
+      getParents: true,
+      getSibings: true,
+      fields: ["*"],
+    },
+    { appId: "WBE_change_family_lists" }
+  );
+  if (aResult[0]) {
+    window.people = [aResult[0]];
+  } else {
+    if (window.people.length == 0) {
+      const getPeopleResult = await getFamilyPeople();
+      window.people = Object.values(getPeopleResult[0].people);
+    }
+  }
+  return true;
 }
 
-async function moveFamilyLists(firstTime = false, wasClicked = false) {
-  const leftHandColumn = $("div.ten").eq(0).prop("id", "leftColumn");
+async function getFamilyPeople(args) {
+  const keys = args?.keys || $("a.pureCssMenui0 span.person").text();
+  const fields = args?.fields || "*";
+  const result = await postToAPI({
+    action: "getPeople",
+    appId: "WBE_changeFamilyLists",
+    keys: keys,
+    fields: fields,
+    resolveRedirect: 1,
+    nuclear: 1,
+  });
+  return result;
+}
+
+function postToAPI(postData) {
+  var ajax = $.ajax({
+    // The WikiTree API endpoint
+    url: "https://api.wikitree.com/api.php",
+
+    // We tell the browser to send any cookie credentials we might have (in case we authenticated).
+    xhrFields: { withCredentials: true },
+
+    // Doesn't help. Not required from (dev|apps).wikitree.com and api.wikitree.com disallows cross-origin:*
+    //'crossDomain': true,
+
+    // We're POSTing the data so we don't worry about URL size limits and want JSON back.
+    type: "POST",
+    dataType: "json",
+    data: postData,
+  });
+
+  return ajax;
+}
+
+async function moveFamilyLists(firstTime = false) {
   const rightHandColumn = $("div.six").eq(0).prop("id", "rightColumn");
   const familyLists = $("#nVitals");
 
@@ -179,16 +289,22 @@ async function moveFamilyLists(firstTime = false, wasClicked = false) {
     let right;
     if (window.innerWidth < 767 || rightHandColumn.find(familyLists).length) {
       familyLists.fadeOut("slow", function () {
-        familyLists.insertAfter($("#birthDetails"));
+        familyLists.removeClass("row");
+        familyLists.insertAfter($("#birthDetails, #profileName").last());
         familyLists.fadeIn("slow");
       });
       right = false;
     } else {
       familyLists.fadeOut("slow", function () {
+        familyLists.addClass("row");
         if ($("a[href='/wiki/Project_protection']").length) {
           familyLists.insertBefore($("a[href='/wiki/Project_protection']").closest("div"));
         } else if ($("#geneticfamily").length) {
-          familyLists.insertBefore($("#geneticfamily"));
+          let $before = $("#geneticfamily");
+          if ($before.prev().is('a[name="DNA"]')) {
+            $before = $before.prev();
+          }
+          familyLists.insertBefore($before);
         } else {
           rightHandColumn.prepend(familyLists);
         }
@@ -197,25 +313,88 @@ async function moveFamilyLists(firstTime = false, wasClicked = false) {
       right = true;
     }
     getFeatureOptions("changeFamilyLists").then((optionsData) => {
-      optionsData.moveToRight = right;
+      optionsData.moveToRight = options.moveToRight = right;
       const storageName = "changeFamilyLists_options";
       chrome.storage.sync.set({
         [storageName]: optionsData,
       });
     });
   } else {
-    getFeatureOptions("changeFamilyLists").then((optionsData) => {
-      if (window.innerWidth < 767) {
-        familyLists.insertAfter($("#birthDetails"));
-      } else if (optionsData.moveToRight) {
-        if ($("div.six a[href='/wiki/Project_protection']").length) {
-          familyLists.insertAfter($("div.six a[href='/wiki/Project_protection']").closest("div"));
-        } else if ($("#geneticfamily").length) {
-          familyLists.insertBefore($("#geneticfamily"));
-        } else {
-          rightHandColumn.prepend(familyLists);
+    if (window.innerWidth < 767) {
+      familyLists.removeClass("row").insertAfter($("#birthDetails, #profileName").last());
+    } else if (options.moveToRight) {
+      familyLists.addClass("row");
+      if ($("div.six a[href='/wiki/Project_protection']").length) {
+        familyLists.insertAfter($("div.six a[href='/wiki/Project_protection']").closest("div"));
+      } else if ($("#geneticfamily").length) {
+        let $before = $("#geneticfamily");
+        if ($before.prev().is('a[name="DNA"]')) {
+          $before = $before.prev();
         }
+        familyLists.insertBefore($before);
+      } else {
+        rightHandColumn.prepend(familyLists);
       }
+    }
+  }
+}
+
+function loadRelatives(profileWTID, onSuccess) {
+  if (profileWTID) {
+    $.ajax({
+      url: "https://api.wikitree.com/api.php",
+      type: "POST",
+      crossDomain: true,
+      xhrFields: { withCredentials: true },
+      dataType: "json",
+      data: {
+        action: "getRelatives",
+        keys: profileWTID,
+        getParents: "1",
+        getSpouses: "1",
+        getChildren: "1",
+        getSiblings: "1",
+        fields:
+          "BirthDate,BirthLocation,BirthName,BirthDateDecade,DeathDate,DeathDateDecade,DeathLocation,IsLiving,Father,FirstName,Gender,Id,LastNameAtBirth,LastNameCurrent,Prefix,Suffix,LastNameOther,Derived.LongName,Derived.LongNamePrivate,Manager,MiddleName,Mother,Name,Photo,RealName,ShortName,Touched,Connected,DataStatus",
+        format: "json",
+        appId: "WBE_change_family_lists",
+      },
+      success: function (data) {
+        const oPerson = data;
+        window.people = [];
+        if (oPerson[0]?.["items"]?.[0]?.["person"]) {
+          window.people = [oPerson[0]["items"][0]["person"]];
+          if (oPerson[0]["items"][0]["person"]?.Connected == 1) {
+            window.profileIsConnected = true;
+          } else {
+            window.profileIsConnected = false;
+          }
+        }
+        const orels = ["Children", "Parents", "Siblings", "Spouses"];
+        orels.forEach(function (rel) {
+          if (oPerson[0]["items"] != null) {
+            if (!window.excludeValues.includes(oPerson[0]["items"][0]["person"][rel])) {
+              if (oPerson[0]["items"][0]["person"][rel].length != 0) {
+                oPerson[0]["items"].forEach(function (item) {
+                  const pKeys = Object.keys(item["person"][rel]);
+                  pKeys.forEach(function (pKey) {
+                    if (rel == "Parents") {
+                      window.hasParents = true;
+                    } else if (rel == "Children") {
+                      window.hasChildren = true;
+                    }
+                    window.people.push(item["person"][rel][pKey]);
+                  });
+                });
+              }
+            }
+          }
+        });
+        if (onSuccess) onSuccess();
+      },
+      error: function (xhr, status) {
+        $("#output").append("<br>There was an error getting the person and their relatives:" + status);
+      },
     });
   }
 }
@@ -224,136 +403,84 @@ function reallyMakeFamLists() {
   if ($("body.profile").length && $("body[class*=page-Space_]").length == 0) {
     const profileWTID = $("a.pureCssMenui0 span.person").text();
     if ($("ul.pureCssMenu.pureCssMenum li:nth-child(2) li:contains('Edit')").length) {
+      /*
       const profileID = $("ul.pureCssMenu.pureCssMenum li:nth-child(2) li:contains('Edit')")
         .find("a")
         .attr("href")
         .split("&u=")[1];
+        */
     }
-    if (profileWTID) {
-      $.ajax({
-        url: "https://api.wikitree.com/api.php",
-        type: "POST",
-        crossDomain: true,
-        xhrFields: { withCredentials: true },
-        dataType: "json",
-        data: {
-          action: "getRelatives",
-          keys: profileWTID,
-          getParents: "1",
-          getSpouses: "1",
-          getChildren: "1",
-          getSiblings: "1",
-          fields:
-            "BirthDate,BirthLocation,BirthName,BirthDateDecade,DeathDate,DeathDateDecade,DeathLocation,IsLiving,Father,FirstName,Gender,Id,LastNameAtBirth,LastNameCurrent,Prefix,Suffix,LastNameOther,Derived.LongName,Derived.LongNamePrivate,Manager,MiddleName,Mother,Name,Photo,RealName,ShortName,Touched,Connected,DataStatus",
-          format: "json",
-        },
-        success: function (data) {
-          const oPerson = data;
-          window.people = [oPerson[0]["items"][0]["person"]];
-          if (oPerson[0]["items"][0]["person"]?.Connected == 1) {
-            window.profileIsConnected = true;
-          } else {
-            window.profileIsConnected = false;
+    loadRelatives(profileWTID, () => {
+      const profilePerson = findPerson(profileWTID);
+      const profileApproxBirthDate = getApproxBirthDate(profilePerson);
+      const profPersonName =
+        profilePerson?.FirstName || profilePerson?.BirthNamePrivate || "the person of the current profile";
+
+      $("span[itemprop='spouse']").each(function () {
+        const theSpouse = $(this);
+        const spouseLinkA = $(this).find("a[href*='wiki']");
+        const spouseLink = spouseLinkA.attr("href");
+        if (options.ageDifferences) theSpouse.addClass("hasRelAge");
+        spouseLinkA.addClass("spouseLink");
+        let spouseId = "#n";
+        if (spouseLink) {
+          const spouseBits = spouseLink.split("/");
+          if (spouseBits[2]) {
+            spouseId = spouseBits[2];
           }
-          const orels = ["Children", "Parents", "Siblings", "Spouses"];
-          orels.forEach(function (rel) {
-            if (oPerson[0]["items"] != null) {
-              if (!window.excludeValues.includes(oPerson[0]["items"][0]["person"][rel])) {
-                if (oPerson[0]["items"][0]["person"][rel].length != 0) {
-                  oPerson[0]["items"].forEach(function (item) {
-                    const pKeys = Object.keys(item["person"][rel]);
-                    pKeys.forEach(function (pKey) {
-                      if (rel == "Parents") {
-                        window.hasParents = true;
-                      } else if (rel == "Children") {
-                        window.hasChildren = true;
-                      }
-                      window.people.push(item["person"][rel][pKey]);
-                    });
-                  });
-                }
+        }
+        window.people.forEach(function (aPerson) {
+          if (aPerson.Name == spouseId) {
+            const spouseDates = displayDates(aPerson);
+            if (aPerson.Name.match(/[']/) != null) {
+              aPerson.Name = aPerson.Name.replace("'", "");
+            }
+            const idName = aPerson.Name.replace(".", "");
+            if ($("#" + idName + "-bdDates").length == 0) {
+              theSpouse.append(
+                " <span class='spouseDates bdDates' id='" + idName + "-bdDates'>" + spouseDates + "</span>"
+              );
+              if (options.ageDifferences && isOK(aPerson["BirthDate"])) {
+                addRelativeAge(spouseLinkA[0], profPersonName, profileApproxBirthDate, aPerson["BirthDate"]);
               }
             }
-          });
-          const mSpouseSpans = $("span[itemprop='spouse']");
-          let spouseId = "";
-          mSpouseSpans.each(function () {
-            const theSpouse = $(this);
-            const spouseLinkA = $(this).find("a[href*='wiki']");
-            const spouseLink = spouseLinkA.attr("href");
-            spouseLinkA.addClass("spouseLink");
-            if (spouseLink) {
-              const spouseBits = spouseLink.split("/");
-              if (spouseBits[2]) {
-                spouseId = spouseBits[2];
-              } else {
-                spouseId = "#n";
-              }
-            } else {
-              spouseId = "#n";
-            }
-            window.people.forEach(function (aPerson) {
-              let spouseDates = "";
-              if (aPerson.Name == spouseId.replace("_", " ")) {
-                spouseDates = displayDates(aPerson);
-                if (aPerson.Name.match(/[']/) != null) {
-                  aPerson.Name = aPerson.Name.replace("'", "");
-                }
-                const idName = aPerson.Name.replace(".", "");
-                if ($("#" + idName + "-bdDates").length == 0) {
-                  theSpouse.append(
-                    " <span class='spouseDates bdDates' id='" + idName + "-bdDates'>" + spouseDates + "</span>"
-                  );
-                }
-                addDataToPerson(theSpouse.closest("div"), aPerson);
-                theSpouse.attr("data-gender", aPerson.Gender);
-              }
-            });
-          });
-
-          //if (typeof profileWTID != "undefined" && !diff && $("#yourConnection").length == 0) {
-          const mID = profileWTID;
-
-          $("#siblingsHeader").off("click");
-          $("body").on("click", "#siblingsHeader", function () {
-            siblingsHeader();
-          });
-
-          setTimeout(function () {
-            addHalfsStyle();
-          }, 1000);
-          /*
-            window.intervalID = setInterval(addUncertain, 500);
-            window.triedUncertain = 0;
-            */
-
-          fixAllPrivates();
-
-          // cleaning up
-          if ($("span.large:contains(Family Member)").length == 0) {
-            makeFamLists();
-            $(".familyList li").each(function () {
-              if (
-                $(this)
-                  .text()
-                  .match(/^,|^Sister|^Brother|^\sand\s/)
-              ) {
-                $(this).remove();
-              }
-            });
+            addDataToPerson(theSpouse.closest("div"), aPerson);
+            theSpouse.attr("data-gender", aPerson.Gender);
           }
-
-          $("span#spousesUnknown").each(function () {
-            if ($(this).text() == "") {
-              $(this).remove();
-            }
-          });
-        },
-        error: function (xhr, status) {
-          $("#output").append("<br>There was an error getting the person:" + data[0].status);
-        },
+        });
       });
-    }
+
+      $("#siblingsHeader").off("click");
+      $("body").on("click", "#siblingsHeader", function () {
+        siblingsHeader();
+      });
+
+      setTimeout(function () {
+        addHalfsStyle();
+      }, 1000);
+
+      fixAllPrivates();
+
+      // cleaning up
+      /*if ($("span.large:contains(Family Member)").length == 0)*/ {
+        makeFamLists();
+        $(".familyList li").each(function () {
+          if (
+            $(this)
+              .text()
+              .match(/^,|^Sister|^Brother|^\sand\s/)
+          ) {
+            $(this).remove();
+          }
+        });
+      }
+
+      $("span#spousesUnknown").each(function () {
+        if ($(this).text() == "") {
+          $(this).remove();
+        }
+      });
+    });
   }
 }
 
@@ -373,12 +500,17 @@ async function addHalfsStyle() {
       $("#siblingList li").each(function () {
         let father = $(this).data("father");
         let mother = $(this).data("mother");
-        let thisID = $(this).data("id");
         let thisLi = $(this);
-        if ((father == p1id && p1id != undefined) || (thisLi.attr("id") == "profilePerson" && BioPerson.Father != 0)) {
-          $(this).find(".bdDates").addClass("parent_1");
+        if (
+          (father == p1id && p1id != undefined) ||
+          (thisLi.attr("id") == "profilePerson" && window.BioPerson.Father != 0)
+        ) {
+          $(this).find("span[itemprop='sibling']").addClass("parent_1");
         }
-        if ((mother == p2id && p2id != undefined) || (thisLi.attr("id") == "profilePerson" && BioPerson.Mother != 0)) {
+        if (
+          (mother == p2id && p2id != undefined) ||
+          (thisLi.attr("id") == "profilePerson" && window.BioPerson.Mother != 0)
+        ) {
           $(this).addClass("parent_2");
         }
       });
@@ -389,9 +521,8 @@ async function addHalfsStyle() {
 function addDataToPerson(el, pData) {
   if (pData) {
     let oGender = "";
-    if (pData.DataStatus.Gender == "blank" || pData.Gender == "") {
-    } else {
-      oGender = pData.Gender;
+    if (!(pData?.DataStatus?.Gender == "blank" || !pData.Gender)) {
+      oGender = pData.Gender || "";
     }
     el.attr("data-gender", oGender);
     el.attr("data-id", pData.Id);
@@ -418,12 +549,12 @@ function siblingsHeader(first = false) {
     el.addClass("clickable");
   });
   let isOn = false;
-  if ($("#siblingsHeader").text().match("iblings")) {
+  if ($("#parentsHeader").text().match("Parents: ")) {
     isOn = true;
   }
   if (first == false) {
     getFeatureOptions("changeFamilyLists").then((optionsData) => {
-      optionsData.changeHeaders = isOn;
+      optionsData.changeHeaders = options.changeHeaders = isOn;
       const storageName = "changeFamilyLists_options";
       chrome.storage.sync.set({
         [storageName]: optionsData,
@@ -483,7 +614,6 @@ function fixNakedPrivates() {
     let firstMatch = tNodes[n].textContent.match(rgx3);
     let ip;
     if (firstMatch != null) {
-      let bors = firstMatch[0].match(rgx2);
       let borsof = firstMatch[0].match(rgx4);
       if (borsof != null) {
         let borsofText = document.createTextNode(borsof);
@@ -514,7 +644,6 @@ function fixNakedPrivates() {
     }
     let firstMatch2 = tNodes[n].textContent.match(rgx5);
     if (firstMatch2 != null) {
-      let husbandOrWife = firstMatch2[0].match(rgx5);
       let husbandOrWifeOf = firstMatch2[0].match(rgx6);
       let privateText = firstMatch2[0].match(/private wife|husband/);
       let fullPrivateText;
@@ -566,7 +695,6 @@ function fixNakedPrivates() {
 
 function makeFamLists() {
   const dparents = document.querySelectorAll('[itemprop="parent"]');
-  let dchildren = document.querySelectorAll('span[itemprop="children"]');
   const addSibling = $("a:contains('[add sibling]')");
   const addChild = $("a:contains('[add child]')");
   const motherQ = $("a:contains('[mother?]')");
@@ -589,13 +717,26 @@ function makeFamLists() {
 
   dparents.forEach(function (aParent) {
     if (aParent.nextElementSibling) {
+      let anIMG;
       if (aParent.nextElementSibling.tagName == "IMG") {
-        aParent.setAttribute("data-dna", aParent.nextElementSibling.getAttribute("title"));
+        anIMG = $(aParent.nextElementSibling);
+      } else if ($(aParent.nextElementSibling).find("img")) {
+        anIMG = $(aParent.nextElementSibling).find("img");
+      }
+      if (anIMG.attr("src")) {
+        if (anIMG.attr("src").match("dna/DNA")) {
+          if (!window.parentDNA) {
+            window.parentDNA = [];
+          }
+          window.parentDNA.push({
+            Name: $(aParent).find("span[itemprop='name']").text(),
+            IMG: $(aParent.nextElementSibling),
+          });
+          aParent.setAttribute("data-dna", $(aParent).find("span[itemprop='name']").text());
+        }
       }
     }
   });
-
-  dchildren = document.querySelectorAll('span[itemprop="children"]');
 
   if (dparents.length > 0) {
     const ofNode2 = $("#parentsHeader")
@@ -606,7 +747,6 @@ function makeFamLists() {
       });
     list2ol(dparents, "parentList");
     if ($("#parentList li").length) {
-      dchildren = document.querySelectorAll('span[itemprop="children"]');
       if ($("#parentList")[0].previousSibling) {
         if ($("#parentList")[0].previousSibling.textContent == "\nand\n") {
           $("#parentList")[0].previousSibling.remove();
@@ -614,7 +754,7 @@ function makeFamLists() {
       }
       let pWord;
       if (ofNode2.length) {
-        ofNode2.each(function (n2) {
+        ofNode2.each(function () {
           if ($(this).text().match("mother")) {
             pWord = "mother";
           } else {
@@ -720,7 +860,7 @@ function makeFamLists() {
 
   if (addSibling.length) {
     let asib = $(addSibling);
-    $("#siblingList").append($("<li id='addSibling'></li>"));
+    $("#siblingList").append($("<li id='addSibling' class='x-edit'></li>"));
     $("#addSibling").append(asib);
     if ($("li:contains('[siblings unknown]')").length) {
       $("li:contains('[siblings unknown]')").remove();
@@ -744,7 +884,7 @@ function makeFamLists() {
   $(".aSpouse").prependTo($("#spouseDetails"));
   if (addChild.length) {
     let ac = $(addChild);
-    $("#childrenList").append($("<li id='addChild'></li>"));
+    $("#childrenList").append($("<li id='addChild' class='x-edit'></li>"));
     $("#addChild").append(ac);
     if ($("li:contains('[children unknown]')").length) {
       $("li:contains('[children unknown]')").remove();
@@ -752,7 +892,7 @@ function makeFamLists() {
   }
   if (motherQ.length) {
     let mq = $(motherQ);
-    $("#parentList").append($("<li id='motherQ'></li>"));
+    $("#parentList").append($("<li id='motherQ' class='x-edit'></li>"));
     $("#motherQ").append(mq);
     if ($("li:contains('[mother unknown]')").length) {
       $("li:contains('[mother unknown]')").remove();
@@ -760,7 +900,7 @@ function makeFamLists() {
   }
   if (fatherQ.length) {
     let fq = $(fatherQ);
-    $("#parentList").prepend($("<li id='fatherQ'></li>"));
+    $("#parentList").prepend($("<li id='fatherQ' class='x-edit'></li>"));
     $("#fatherQ").append(fq);
     if ($("li:contains('[father unknown]')").length) {
       $("li:contains('[father unknown]')").remove();
@@ -770,7 +910,6 @@ function makeFamLists() {
   // $(".aSpouse").length > 1 &&
 
   if ($("#childrenList li").length) {
-    let sameParent = true;
     let checkParent = "mother";
     const parentIDs = [];
     if ($(".aSpouse").length) {
@@ -784,10 +923,8 @@ function makeFamLists() {
         parentIDs.push(parentID);
       }
     });
-    console.log(parentIDs);
     if (parentIDs.length > 1 || $(".aSpouse").length > 1) {
       $(".aSpouse").each(function (index) {
-        console.log(parentIDs);
         let spouseID = $(this).data("id");
         let aSpouse = $(this);
         $("#childrenList li").each(function () {
@@ -801,18 +938,87 @@ function makeFamLists() {
   }
 }
 
+function getApproxBirthDate(person) {
+  let bDate = person?.BirthDate || "";
+  if (isOK(bDate)) {
+    bDate = getApproxDate(bDate);
+    bDate.Approx ||= person?.DataStatus.BirthDate != "certain" && person?.DataStatus.BirthDate != "";
+  }
+  return bDate;
+}
+
+function findPerson(did) {
+  const wtId = did.replaceAll(" ", "_");
+  let dPeep = null;
+  const peeps = window.people;
+  const pLen = peeps.length;
+  for (let w = 0; w < pLen; w++) {
+    if (peeps[w].Name) {
+      if (wtId == peeps[w].Name) {
+        dPeep = peeps[w];
+        break;
+      }
+    } else if (peeps[w].Id) {
+      const linkElement = $('ul.profile-tabs a[href*="Special:TrustedList"]');
+
+      if (linkElement.length > 0) {
+        const href = linkElement.attr("href");
+        const regex = /u=(\d+)/;
+        const match = href.match(regex);
+
+        if (match) {
+          const uValue = match[1];
+          if (uValue == peeps[w].Id) {
+            dPeep = peeps[w];
+            const changesTabElement = $('ul.profile-tabs a[href*="Special:NetworkFeed"]');
+            const href2 = changesTabElement.attr("href");
+            const regex2 = /who=(.+)/;
+            const match2 = href2.match(regex2);
+            if (match2) {
+              dPeep.Name = match2[1];
+              dPeep.FirstName = $("span[itemprop='givenName']").text();
+              dPeep.LastNameAtBirth = $("span[itemprop='familyName']").text();
+              dPeep.LastNameCurrent = $("a[title='Current Last Name']").text();
+              dPeep.LastNameAtBirth = $("a[title='Last Name at Birth']").text();
+              dPeep.BirthDate = $("time[itemprop='birthDate']").attr("datetime");
+              dPeep.DeathDate = $("time[itemprop='deathDate']").attr("datetime");
+              dPeep.Gender = "";
+            }
+            break;
+          }
+        }
+      } else {
+        console.log("Link not found.");
+      }
+    }
+  }
+  return dPeep;
+}
+
 function list2ol(items, olid) {
+  const addAges = (options.parentAges && olid == "parentList") || (options.ageDifferences && olid != "parentList");
   const nList = document.createElement("ol");
   nList.id = olid;
   nList.className = "nameList";
-  items[0].parentNode.insertBefore(nList, items[0]);
+  if (addAges) {
+    nList.classList.add("hasRelAge");
+  }
 
-  const dnaImg = $(
-    "<img src='https://www.wikitree.com/images/icons/dna/DNA-confirmed.gif' height='12' width='38' alt='DNA confirmed' class='dnaConfirmed' title='DNA confirmed'>"
-  );
+  items[0].parentNode.insertBefore(nList, items[0]);
+  const profilePerson = window.people?.[0];
+  let isPrivate = false;
+  if (!profilePerson?.Name) {
+    isPrivate = true;
+  }
+  let profileFirstName = null;
+  let profileApproxBirthDate = null;
+  if (addAges) {
+    profileFirstName = profilePerson?.FirstName || profilePerson?.BirthNamePrivate || "this profile person";
+    profileApproxBirthDate = getApproxBirthDate(profilePerson);
+  }
 
   items.forEach(function (item) {
-    var dob, dobStatus, dod, dodStatus, ddates, doby, dody, dobyStatus, dodyStatus, dHalf;
+    var dHalf;
     let nLi = document.createElement("li");
     let dNext = item.nextSibling;
     if (dNext) {
@@ -854,29 +1060,26 @@ function list2ol(items, olid) {
     }
 
     if (item.getAttribute("data-dna")) {
-      let anImg = dnaImg.clone();
-      nLi.append(anImg[0]);
+      window.parentDNA.forEach(function (anIMG) {
+        if (anIMG.Name == item.textContent) {
+          nLi.append(anIMG.IMG[0]);
+        }
+      });
     }
     nList.appendChild(nLi);
 
     let dLink = item.querySelector("a");
     if (dLink != "undefined" && dLink != null) {
       let dhref = dLink.href;
+      dLink.href = dLink.href.replace(/\s|%20/g, "_");
       let dbits = dhref.split("wiki/");
 
       let did = decodeURIComponent(dbits[1].replace(/#.*/, ""));
-      let dPeep = "";
-      let peeps = window.people;
-
-      let pLen = peeps.length;
-      for (let w = 0; w < pLen; w++) {
-        if (did == peeps[w].Name.replace(/_/g, " ")) {
-          dPeep = peeps[w];
-        }
+      let dPeep = findPerson(did);
+      if (dPeep && !isPrivate) {
+        addDataToPerson($(dLink).closest("li"), dPeep);
+        list2ol2(dPeep, profileFirstName, profileApproxBirthDate);
       }
-      addDataToPerson($(dLink).closest("li"), dPeep);
-      list2ol2(dPeep);
-      let dchildren = document.querySelectorAll('span[itemprop="children"]');
     }
   });
   while (nList.nextSibling) {
@@ -884,11 +1087,13 @@ function list2ol(items, olid) {
   }
 
   window.inserted = false;
-  window.insertInterval = setInterval(insertInSibList, 500);
+  if (!isPrivate) {
+    window.insertInterval = setInterval(insertInSibList, 500);
+  }
   window.triedInsertSib = 0;
 }
 
-function list2ol2(person) {
+function list2ol2(person, profPersonName, profileApproxBirthDate) {
   let pdata = person;
   let dob, dod, doby, dody;
   let dobStatus = "";
@@ -896,7 +1101,10 @@ function list2ol2(person) {
   if (pdata != null && pdata != undefined) {
     if (typeof pdata["BirthDate"] != "undefined") {
       dob = pdata["BirthDate"];
-      dobStatus = status2symbol(pdata["DataStatus"]["BirthDate"]);
+      dobStatus = "";
+      if (pdata.DataStatus) {
+        dobStatus = status2symbol(pdata?.DataStatus?.BirthDate);
+      }
     } else {
       dob = "";
     }
@@ -914,11 +1122,11 @@ function list2ol2(person) {
       }
     } else {
       doby = " ";
-      var disGender, male, female;
+      var disGender;
       let disID = htmlEntities(pdata["Name"]);
 
       if (disID) {
-        let disLink = document.querySelector("#nVitals a[href='/wiki/" + disID);
+        let disLink = document.querySelector("#nVitals a[href='/wiki/" + disID + "'");
 
         if (isOK(disLink)) {
           let disTitle = disLink.title;
@@ -985,34 +1193,132 @@ function list2ol2(person) {
       ddates = "";
     }
 
-    let datesSpan = document.createElement("span");
+    const datesSpan = document.createElement("span");
     datesSpan.className = "bdDates";
     datesSpan.setAttribute("data-birth-year", doby);
     datesSpan.setAttribute("data-death-year", dody);
-    let ddn = document.createTextNode(" " + ddates);
+    const ddn = document.createTextNode(" " + ddates);
     datesSpan.appendChild(ddn);
-    let das = document.querySelectorAll("#nVitals a");
-    let done = false;
-    let checkit = encodeURIComponent(pdata["Name"]).replaceAll(/%2C/g, ",");
-    das.forEach(function (ana) {
-      var re = new RegExp(checkit + "$");
-      if (ana.href == "https://www.wikitree.com/wiki/" + checkit && done == false) {
-        ana.parentNode.appendChild(datesSpan);
-        done = true;
-        if (typeof pdata["Gender"] != "undefined") {
-          if (pdata["Gender"] == "Male") {
-            ana.parentNode.parentNode.setAttribute("data-gender", "male");
-          } else if (pdata["Gender"] == "Female") {
-            ana.parentNode.parentNode.setAttribute("data-gender", "female");
-          }
+    const checkit = encodeURIComponent(pdata["Name"]).replaceAll(/%2C/g, ",");
+    const ana = document.querySelector("#nVitals a[href='https://www.wikitree.com/wiki/" + checkit + "'");
+    if (ana) {
+      if (profPersonName && profileApproxBirthDate != "" && isOK(pdata["BirthDate"])) {
+        addRelativeAge(ana, profPersonName, profileApproxBirthDate, pdata["BirthDate"]);
+      }
+      ana.after(datesSpan);
+      if (typeof pdata["Gender"] != "undefined") {
+        if (pdata["Gender"] == "Male") {
+          ana.parentNode.parentNode.setAttribute("data-gender", "male");
+        } else if (pdata["Gender"] == "Female") {
+          ana.parentNode.parentNode.setAttribute("data-gender", "female");
+        }
 
-          if (pdata["Gender"] == "" || pdata.DataStatus.Gender == "blank") {
-            ana.parentNode.parentNode.setAttribute("data-gender", "");
-          }
+        if (pdata["Gender"] == "" || pdata.DataStatus.Gender == "blank") {
+          ana.parentNode.parentNode.setAttribute("data-gender", "");
+        }
+      }
+    }
+  }
+}
+
+function addRelativeAge(ana, profPersonName, profileApproxBirthDate, relativesBirthDate) {
+  const relType = ana.parentNode.getAttribute("itemprop");
+  const pName = ana.querySelector("span[itemprop='name']").innerText;
+  const ageAt = getAgeAt(profileApproxBirthDate, getApproxDate(relativesBirthDate), relType);
+  const theYearStr = ageStr(ageAt);
+  const ageSpan = document.createElement("span");
+  ageSpan.classList.add("relAge");
+  ageSpan.appendChild(document.createTextNode(` (${ageAt.approx}${ageAt.sign}${ageAt.number})`));
+  let titleText;
+  if (relType == "parent") {
+    titleText = `${pName} was ${theYearStr} when ${profPersonName} was born`;
+  } else {
+    let yearWords = "";
+    if (theYearStr == 0) {
+      yearWords = "in the same year as";
+    } else {
+      yearWords = `${theYearStr} year${Math.abs(ageAt.number) == 1 ? "" : "s"} ${
+        ageAt.sign == "-" ? "before" : "after"
+      }`;
+    }
+    titleText = `${pName} was born ${yearWords} ${profPersonName}`;
+  }
+  ageSpan.setAttribute("title", titleText);
+  ana.after(ageSpan);
+}
+
+function ageStr(a) {
+  return `${a.approx == "" ? "" : "about "}${a.number}`;
+}
+
+function getWtId(link) {
+  let wtId = "";
+  let href = link.getAttribute("href");
+  if (href !== null) {
+    const id = href.split("wiki/")[1];
+    if (id != "") {
+      wtId = decodeURIComponent(id.replace(/#.*/, ""));
+    }
+  }
+  return wtId;
+}
+
+function getAgeAt(profPersonBirthDate, relativesBirthDate, relation) {
+  let approx = "";
+
+  if (profPersonBirthDate.Approx == true || relativesBirthDate.Approx == true) {
+    approx = "~";
+  }
+  const dt1 = relativesBirthDate.Date;
+  const dt2 = profPersonBirthDate.Date;
+  const showYearsSince = relation != "parent";
+  let diff;
+  let sign = "";
+  if (showYearsSince) {
+    // we'll always return a positive number
+    const yearsSince = getAge(dt2, dt1);
+    diff = yearsSince[0];
+    if (diff > 0) {
+      sign = "+";
+    } else if (diff < 0) {
+      sign = "-";
+      diff = -diff;
+    }
+  } else {
+    // parents should always be older than their child, so we assume positive,
+    // but if it is not, then we'll just show it as is (i.e. we return a negative number).
+    const ageAt = getAge(dt1, dt2);
+    diff = ageAt[0];
+  }
+  return { approx: approx, sign: sign, number: diff };
+}
+
+function addRelativeAges(profilePerson) {
+  loadRelatives(profilePerson.Name, () => {
+    const profileApproxBirthDate = getApproxBirthDate(profilePerson);
+    const profPersonName =
+      profilePerson?.FirstName || profilePerson?.BirthNamePrivate || "the person of the current profile";
+    // if we get here, either parents, or siblings and children or all should get ages
+    let selector = "#nVitals a[href^='/wiki/']"; // assume everyone
+    if (!options.parentAges) {
+      // siblings and children only
+      selector =
+        "#nVitals span[itemprop='sibling'] a[href^='/wiki/'], #nVitals span[itemprop='children'] a[href^='/wiki/']";
+    } else if (!options.ageDifferences) {
+      // parents only
+      selector = "#nVitals span[itemprop='parent'] a[href^='/wiki/']";
+    }
+    document.querySelectorAll(selector).forEach((ana) => {
+      const wtId = getWtId(ana);
+      if (wtId != "") {
+        const relative = findPerson(wtId);
+        const relativesBirthDate = relative ? relative["BirthDate"] : null;
+        if (isOK(relativesBirthDate)) {
+          addRelativeAge(ana, profPersonName, profileApproxBirthDate, relativesBirthDate);
         }
       }
     });
-  }
+  });
 }
 
 function textNodesUnder(el) {
@@ -1026,14 +1332,10 @@ function textNodesUnder(el) {
 async function addChildrenCount() {
   if ($("#childrenCount").length == 0) {
     const siblingLength = $(".VITALS span[itemprop='sibling']").length;
-    $("<span id='siblingCount'>(" + siblingLength + ")</span>").insertAfter(
-      $(".VITALS span[itemprop='sibling']").eq(siblingLength - 1)
-    );
+    $("#siblingDetails").append($("<span id='siblingCount'>[" + siblingLength + "]</span>"));
 
     const childrenLength = $(".VITALS span[itemprop='children']").length;
-    $("<span id='childrenCount'>(" + childrenLength + ")</span>").insertAfter(
-      $(".VITALS span[itemprop='children']").eq(childrenLength - 1)
-    );
+    $("#childrenDetails").append($("<span id='childrenCount'>[" + childrenLength + "]</span>"));
   }
 }
 
@@ -1048,7 +1350,7 @@ async function prepareHeadings() {
       let ofMatch = n1.textContent.match("of");
       let regexMatch = n1.textContent.match(regex);
       let wrongMatch = false;
-      if (regexMatch && ofMatch == null && n2.textContent.match(" of ") == null) {
+      if (regexMatch && ofMatch == null && !/\bof\b/.test(n2.textContent)) {
         wrongMatch = true;
       }
       if (regexMatch && wrongMatch != true) {
@@ -1123,7 +1425,6 @@ function createPrivateAndDates(aNode, nextSib, ip) {
   nSpan.setAttribute("itemprop", ip);
   nSpan.setAttribute("data-private", "1");
   $(nSpan).addClass(ip);
-  let nComma = document.createTextNode(",");
   let nText = aNode.textContent.replace(/.*\[/, "[");
   nText = nText.replace(/((Brother)|(Sister))\sof\s/, "");
   nText = nText + "]";
@@ -1212,7 +1513,7 @@ function insertInSibList() {
         }
 
         let theSib, sibDate, sibBY;
-        sibDates.each(function (index) {
+        sibDates.each(function () {
           if (!theSib) {
             sibDate = $(this).text().split("-");
             if (sibDate.length > 1) {
@@ -1239,7 +1540,7 @@ function insertInSibList() {
       }
     }
     if ($(".parent_1").length) {
-      $("#profilePerson .bdDates").addClass("parent_1");
+      $("#profilePerson span[itemprop='sibling']").addClass("parent_1");
     }
     if ($(".parent_2").length) {
       $("#profilePerson").addClass("parent_2");
@@ -1270,7 +1571,8 @@ function insertInSibList() {
     if (
       $(this)
         .text()
-        .match(/\] and	\[private/)
+        // eslint-disable-next-line no-control-regex
+        .match(/\] and	\[private|\], \[private/)
     ) {
       $(this).remove();
     }
@@ -1332,7 +1634,7 @@ function setUpMarriedOrSpouse() {
 
     let spouseVITALS = $(".VITALS.spouseDetails");
     spouseVITALS.addClass("aSpouse");
-    $("div.aSpouse").each(function (index, el) {
+    $("div.aSpouse").each(function () {
       const marriageSpan = $("<span class='marriageDetails'></span>");
       const spouseName = $(this).find("span[itemprop='spouse']");
       marriageSpan.insertAfter(spouseName);
@@ -1360,11 +1662,9 @@ function setUpMarriedOrSpouse() {
         }
       }
 
-      getFeatureOptions("changeFamilyLists").then((options) => {
-        if (options.agesAtMarriages) {
-          addMarriageAges();
-        }
-      });
+      if (options.agesAtMarriages) {
+        addMarriageAges();
+      }
     });
 
     $(".spouseText").eq(0).prependTo("#spouseDetails");
@@ -1385,6 +1685,7 @@ function extraBitsForFamilyLists() {
     sibsUnknown.appendTo("#siblingDetails");
     $("#siblingList").remove();
     $("#parentDetails").prependTo("#nVitals");
+    $("#nVitals > .sidebar-heading").prependTo("#nVitals"); // prevent the sections from being re-added above the heading
     $("#siblingDetails").insertAfter("#parentDetails");
   } else if ($("#siblingDetails").length) {
     let sNodes = $("#siblingDetails")[0].childNodes;
@@ -1437,7 +1738,6 @@ function extraBitsForFamilyLists() {
   let noSpousePublic = "[spouse(s) unknown]";
   let noSpousePrivate = "[spouse?]";
   let spouseVITALS = $(".VITALS.spouseDetails");
-  let noSpouseVITALS = $(".VITALS:contains('[spouse(s) unknown]')");
   spouseVITALS.addClass("aSpouse");
   if ($(".aSpouse").length) {
     $(".aSpouse").each(function () {
@@ -1512,53 +1812,52 @@ function extraBitsForFamilyLists() {
     .attr("data-gender", "female");
 }
 
+function amaTimer() {
+  window.runningAMA++;
+  if (window.people[0]?.Spouses != undefined) {
+    window.doneMarriageAges = true;
+    let oSpouses = Object.entries(window.people[0]?.Spouses);
+    oSpouses.forEach(function (aSpouse) {
+      let aSp = aSpouse[1];
+      if (isOK(aSp.marriage_date)) {
+        let bioPersonMarriageAge;
+        if (!window.excludeValues.includes(window.people[0].BirthDate)) {
+          bioPersonMarriageAge = getMarriageAge(window.people[0].BirthDate, aSp.marriage_date, window.people[0]);
+        }
+        let aSpMarriageAge = getMarriageAge(aSp.BirthDate, aSp.marriage_date, aSp);
+        let spBit = "";
+        let bpBit = "";
+        if (bioPersonMarriageAge) {
+          bpBit = window.people[0].FirstName + " (" + bioPersonMarriageAge + ")";
+        }
+        if (isOK(aSp.BirthDate)) {
+          spBit = aSp.FirstName + " (" + aSpMarriageAge + ")";
+          if (bioPersonMarriageAge) {
+            spBit = "; " + spBit;
+          }
+        }
+        $(`.spouseDetails a[href$="${aSp.Name.replaceAll(/\s/g, "_")}"]`)
+          .closest("div")
+          .append($("<span class='marriageAges'>" + bpBit + spBit + "</span>"));
+      }
+    });
+  }
+  if (window.runningAMA > 10 || window.doneMarriageAges == true) {
+    clearInterval(window.ama);
+  }
+}
+
 async function addMarriageAges() {
   window.runningAMA = 0;
   if (window.doneMarriageAges == undefined) {
     window.ama = setInterval(amaTimer, 2000);
     window.doneMarriageAges = false;
-
-    function amaTimer() {
-      window.runningAMA++;
-      if (window.people[0]?.Spouses != undefined) {
-        window.doneMarriageAges = true;
-        let oSpouses = Object.entries(window.people[0]?.Spouses);
-        oSpouses.forEach(function (aSpouse) {
-          let aSp = aSpouse[1];
-          if (isOK(aSp.marriage_date)) {
-            let bioPersonMarriageAge;
-            if (!excludeValues.includes(window.people[0].BirthDate)) {
-              bioPersonMarriageAge = getMarriageAge(window.people[0].BirthDate, aSp.marriage_date, window.people[0]);
-            }
-            let aSpMarriageAge = getMarriageAge(aSp.BirthDate, aSp.marriage_date, aSp);
-            let spBit = "";
-            let bpBit = "";
-            if (bioPersonMarriageAge) {
-              bpBit = window.people[0].FirstName + " (" + bioPersonMarriageAge + ")";
-            }
-            if (isOK(aSp.BirthDate)) {
-              spBit = aSp.FirstName + " (" + aSpMarriageAge + ")";
-              if (bioPersonMarriageAge) {
-                spBit = "; " + spBit;
-              }
-            }
-            $(`.spouseDetails a[href\$="${aSp.Name.replaceAll(/\s/g, "_")}"]`)
-              .closest("div")
-              .append($("<span class='marriageAges'>" + bpBit + spBit + "</span>"));
-          }
-        });
-      }
-      if (window.runningAMA > 10 || window.doneMarriageAges == true) {
-        clearInterval(window.ama);
-      }
-    }
   }
 }
 
 function getMarriageAge(d1, d2, mPerson) {
   const bDate = getApproxDate(d1);
   const mDate = getApproxDate(d2);
-
   let approx = "";
 
   if (
@@ -1582,7 +1881,7 @@ function getApproxDate(theDate) {
     approx = true;
   } else {
     const bits = theDate.split("-");
-    if (theDate.match(/00\-00$/) != null || !bits[1]) {
+    if (theDate.match(/00-00$/) != null || !bits[1]) {
       aDate = bits[0] + "-07-02";
       approx = true;
     } else if (theDate.match(/-00$/) != null) {
@@ -1594,7 +1893,13 @@ function getApproxDate(theDate) {
   }
   return { Date: aDate, Approx: approx };
 }
-
+/**
+ * Calculates the number of full years and days between two dates.
+ *
+ * @param {(string|Object)} start - The start date as a string in the format "YYYY-MM-DD" or an object with `year`, `month`, and `date` properties.
+ * @param {string} [end=false] - The end date as a string in the format "YYYY-MM-DD". Defaults to `false` (i.e., the current date).
+ * @returns {([number,number,number]|undefined)} An array of [fullYears,andDays,totalDays] or `undefined` if the input is invalid.
+ */
 export function getAge(start, end = false) {
   let start_day, start_month, start_year, end_day, end_month, end_year;
   if (typeof start === "object") {
@@ -1604,7 +1909,6 @@ export function getAge(start, end = false) {
     end_day = parseInt(start.end.date);
     end_month = parseInt(start.end.month);
     end_year = parseInt(start.end.year);
-    console.log();
   } else {
     const startSplit = start.split("-");
     start_day = parseInt(startSplit[2]);
@@ -1756,25 +2060,18 @@ function status2symbol(ostatus) {
   switch (ostatus) {
     case "guess":
       return "~";
-      break;
     case "abt":
       return "~";
-      break;
     case "before":
       return "<";
-      break;
     case "bef":
       return "<";
-      break;
     case "after":
       return ">";
-      break;
     case "aft":
       return ">";
-      break;
     case "certain":
       return "";
-      break;
     default:
       return "";
   }
@@ -1784,18 +2081,56 @@ function addParentStatus() {
   setTimeout(function () {
     if (window.people) {
       const profileP = window.people[0];
-      if (profileP.DataStatus?.Father == "10") {
-        $("#parentList li[data-gender='male'] a").append($("<span class='uncertain'>[uncertain]</span>"));
-      }
-      if (profileP.DataStatus?.Father == "5") {
-        $("#parentList li[data-gender='male'] a").append($("<span class='non-biological'>[non-biological]</span>"));
-      }
-      if (profileP.DataStatus?.Mother == "10") {
-        $("#parentList li[data-gender='female'] a").append($("<span class='uncertain'>[uncertain]</span>"));
-      }
-      if (profileP.DataStatus?.Mother == "5") {
-        $("#parentList li[data-gender='female'] a").append($("<span class='non-biological'>[non-biological]</span>"));
+      if (profileP) {
+        if ($("#parentList li[data-gender='male'] a span:contains([uncertain])").length == 0) {
+          if (profileP.DataStatus?.Father == "10") {
+            $("#parentList li[data-gender='male'] a").append(
+              $("<span class='uncertain dataStatus'>[uncertain]</span>")
+            );
+          }
+          if (profileP.DataStatus?.Father == "5") {
+            $("#parentList li[data-gender='male'] a").append(
+              $("<span class='non-biological dataStatus'>[non-biological]</span>")
+            );
+          }
+        }
+
+        if ($("#parentList li[data-gender='female'] a span:contains([uncertain])").length == 0) {
+          if (profileP.DataStatus?.Mother == "10") {
+            $("#parentList li[data-gender='female'] a").append(
+              $("<span class='uncertain  dataStatus'>[uncertain]</span>")
+            );
+          }
+          if (profileP.DataStatus?.Mother == "5") {
+            $("#parentList li[data-gender='female'] a").append(
+              $("<span class='non-biological  dataStatus'>[non-biological]</span>")
+            );
+          }
+        }
       }
     }
+    addDNAstatusToChildren();
   }, 3000);
+}
+
+function addDNAstatusToChildren() {
+  // Find the name from the element
+  const nameToFind = $("a.pureCssMenui0 span.person").text();
+
+  // Find the person whose Name matches
+  const parentPerson = window.people?.find((person) => person.Name === nameToFind);
+
+  // Check if the person was found
+  if (parentPerson) {
+    // Get the parent's Id
+    const parentId = parentPerson.Id;
+
+    $(
+      `#childrenList li[data-father="${parentId}"][data-father-status="30"],#childrenList li[data-mother="${parentId}"][data-mother-status="30"]`
+    ).append(
+      $(
+        '<img class="DNAConfirmed" src="/images/icons/dna/DNA-confirmed.gif" border="0" width="38" height="12" alt="DNA confirmed" title="Confirmed with DNA testing">'
+      )
+    );
+  }
 }

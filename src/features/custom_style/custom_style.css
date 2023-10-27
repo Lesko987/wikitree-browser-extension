@@ -1,0 +1,76 @@
+/* Template:Green */
+span[style="color:#006800"] {
+  color: #006800 !important;
+}
+
+/* Template:Red */
+span[style="color:#b60000"] {
+  color: #b60000 !important;
+}
+
+/* Blue */
+span[style="color:#0000ff"] {
+  color: #0000ff !important;
+}
+
+/* Brown */
+span[style="color:#cd853f"] {
+  color: #cd853f !important;
+}
+
+/* Grey */
+span[style="color:#C0C0C0"] {
+  color: #c0c0c0 !important;
+}
+
+/* Lime Green */
+span[style="color:#66cd00"] {
+  color: #66cd00 !important;
+}
+
+/* Orange */
+span[style="color:#ff7f24"] {
+  color: #ff7f24 !important;
+}
+
+/* Light Yellow Background */
+span[style="background-color:#eeffaa"] {
+  background-color: #eeffaa !important;
+}
+
+/* Yellow */
+span[style="color:#eead0e"] {
+  color: #eead0e !important;
+}
+
+/* Lighter Yellow Background */
+span[style="background-color:#ffee99"] {
+  background-color: #ffee99 !important;
+}
+
+/* Purple */
+span[style="color:#c07fee"] {
+  color: #c07fee !important;
+}
+
+#distanceFromYou {
+  background: transparent;
+}
+
+.fontSizeButton {
+  display: inline-block;
+  width: 16px;
+  height: 20px;
+  background-position: 5px -644px;
+  background-repeat: no-repeat;
+  line-height: 25px;
+  height: 15px;
+  border: 1px solid grey;
+  padding: 5px;
+  position: relative;
+  top: -1px;
+  border-radius: 3px;
+  background-color: #eee;
+  margin-right: 2px;
+  cursor: pointer;
+}

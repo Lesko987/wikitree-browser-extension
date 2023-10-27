@@ -3,24 +3,23 @@ Created By: Aleš Trtnik (Trtnik-2)
 */
 
 import { isWikiEdit } from "../../core/pageType";
-import { checkIfFeatureEnabled, getFeatureOptions } from "../../core/options/options_storage";
-import { wtAPICatCIBSearch } from "../../core/wtPlusAPI/wtPlusAPI";
+import { shouldInitializeFeature, getFeatureOptions } from "../../core/options/options_storage";
+import { wtAPICatCIBSearch } from "../../core/API/wtPlusAPI";
+import { dataTables, dataTableTemplateFindByName, dataTablesLoad } from "../../core/API/wtPlusData";
 
 let tb = {};
 
-checkIfFeatureEnabled("wtplus").then((result) => {
+const newTabIconURL = chrome.runtime.getURL("images/newTab.png");
+
+shouldInitializeFeature("wtplus").then((result) => {
   if (result && isWikiEdit) {
     import("./wtPlus.css");
     initWTPlus();
   }
 });
 
-function itemsFindByTemplate(name) {
-  return tb.templates.filter((item) => item.name.toUpperCase() === name.toUpperCase())[0];
-}
-
 function paramsCopy(templateName) {
-  tb.template = itemsFindByTemplate(templateName);
+  tb.template = dataTableTemplateFindByName(templateName);
   tb.templateitems = tb.template.prop.map((item) => {
     return {
       name: item.name,
@@ -49,7 +48,7 @@ function paramsFromSelection() {
     .filter((par) => par != "");
   tb.textSelected = tb.textSelected.replace("{{", "").replace("}}", "");
   params[0] = params[0].replace("{{", "").replace("}}", "").replace("_", " ");
-  tb.template = itemsFindByTemplate(params[0]);
+  tb.template = dataTableTemplateFindByName(params[0]);
   if (tb.template) {
     params.splice(0, 1);
     var paramsNumbered = params.filter((par) => !par.includes("="));
@@ -153,13 +152,23 @@ const urlMappings = [
   { type: "", placeholder: "Undefined type" },
   { type: "typeText", placeholder: "Enter text" },
   { type: "typeNumber", placeholder: "Enter a number" },
-  { type: "typeYear", placeholder: "Enter year" },
+  { type: "typeDate", placeholder: "Enter date (d mmm yyyy)" },
+  { type: "typeYear", placeholder: "Enter year (yyyy)" },
   { type: "typeYes", placeholder: "Enter yes" },
   { type: "typeNo", placeholder: "Enter no" },
   { type: "typeURL", placeholder: "Enter URL https://...", prefixURL: "", sufixURL: "", emptyURL: "" },
   {
     type: "typeWikitreeID",
     placeholder: "Enter profile's WikitreeID",
+    prefixURL: "https://www.wikitree.com/wiki/",
+    sufixURL: "",
+    emptyURL: "",
+    toURL: reformatTexttoWiki,
+    fromURL: reformatWikitoText,
+  },
+  {
+    type: "typeUser",
+    placeholder: "Enter user's WikitreeID",
     prefixURL: "https://www.wikitree.com/wiki/",
     sufixURL: "",
     emptyURL: "",
@@ -739,7 +748,7 @@ function selectTemplate(data) {
     '><label for="cb5"> CategoryInfoBox</label><br>' +
     '<label for="flt1">Filter: </label><input type="text" class="cbFilter" id="flt1" name="flt1" data-op="onDlgSelectTemplateFlt" data-id="9" autofocus><br>' +
     '<div style="min-width: 600px;overflow-y:auto;height: 400px;"><table style="width: 100%;" id="tb">' +
-    tb.templates
+    dataTables.templates
       .map(
         (item) =>
           '<tr class="trSelect" data-op="onDlgSelectTemplateTrSel"><td>' +
@@ -777,7 +786,7 @@ function onDlgSelectTemplateFlt() {
   var s1 = tb.elDlg.querySelector("#flt1").value;
   var r1 = new RegExp(s1, "i");
 
-  lb.innerHTML = tb.templates
+  lb.innerHTML = dataTables.templates
     .filter(
       (item) =>
         (s0 === "" || item.type.match(r0)) &&
@@ -786,7 +795,9 @@ function onDlgSelectTemplateFlt() {
     )
     .map(
       (item) =>
-        '<tr class="trSelect" data-op="onDlgSelectTemplateTrSel"><td>' +
+        '<tr class="trSelect" data-op="onDlgSelectTemplateTrSel">' +
+        `<td><a target="_blank" href="https://www.wikitree.com/wiki/Template:${item.name}"><img src="${newTabIconURL}"'></a></td>` +
+        "<td>" +
         item.name +
         "</td><td>" +
         item.group +
@@ -811,7 +822,7 @@ function onDlgSelectTemplateBtn(update) {
     }
     tb.elDlg.close();
     //Add template
-    var templateName = tb.elDlg.querySelectorAll(".trSelected>td")[0].innerText;
+    var templateName = tb.elDlg.querySelectorAll(".trSelected>td")[1].innerText;
     paramsCopy(templateName);
     paramsInitialValues();
     editTemplate("Added");
@@ -864,7 +875,7 @@ function onDlgSelectCIBFlt() {
   var s1 = tb.elDlgCIB.querySelector("#flt1").value;
 
   if (s1.length < 3) {
-    cntr.innerHTML = "enter word(s) to find"
+    cntr.innerHTML = "enter word(s) to find";
   } else {
     // Retrieve categories
     cntr.innerHTML = "Retrieving...";
@@ -891,9 +902,7 @@ function onDlgSelectCIBFlt() {
           .map(
             (item) =>
               "<tr>" +
-              `<td><a target="_blank" href="https://www.wikitree.com/wiki/Category:${
-                item.category
-              }"><img src="${chrome.runtime.getURL("images/newTab.png")}"'></a></td>` +
+              `<td><a target="_blank" href="https://www.wikitree.com/wiki/Category:${item.category}"><img src="${newTabIconURL}"'></a></td>` +
               '<td class="tdSelect" data-op="onDlgSelectCIBTrSel" title="' +
               (item.name ? "&#10;Name: " + item.name : "") +
               (item.aka ? "&#10;aka:&#10;&nbsp;&nbsp;" + item.aka.replaceAll(";", "&#10;&nbsp;&nbsp;") : "") +
@@ -979,19 +988,19 @@ function AutoUpdate() {
       if (tb.birthLocation) {
         s0 = "Birth Location";
         s1 = tb.birthLocation;
-        actArr = tb.locations;
+        actArr = dataTables.locations;
       }
     } else if (loc == 1) {
       if (tb.deathLocation) {
         s0 = "Death Location";
         s1 = tb.deathLocation;
-        actArr = tb.locations;
+        actArr = dataTables.locations;
       }
     } else if (loc == 2) {
       if (tb.textAll) {
         s0 = "Bio";
         s1 = tb.textAll;
-        actArr = tb.cleanup;
+        actArr = dataTables.cleanup;
       }
     }
     if (actArr) {
@@ -1085,15 +1094,15 @@ function onDlgProfileCleanupBtn(update) {
       if (loc == 0) {
         s0 = "Birth Location";
         s1 = tb.birthLocation;
-        actArr = tb.locations;
+        actArr = dataTables.locations;
       } else if (loc == 1) {
         s0 = "Death Location";
         s1 = tb.deathLocation;
-        actArr = tb.locations;
+        actArr = dataTables.locations;
       } else if (loc == 2) {
         s0 = "Bio";
         s1 = tb.textAll;
-        actArr = tb.cleanup;
+        actArr = dataTables.cleanup;
       }
       if (actArr) {
         for (var j = 0; j < actArr.length; j++) {
@@ -1216,8 +1225,8 @@ function onDlgPasteSourcePaste(i, evt) {
     var s1 = "";
     s = decodeURIComponent(s);
 
-    if (tb.sources) {
-      for (let source of tb.sources) {
+    if (dataTables.sources) {
+      for (let source of dataTables.sources) {
         var b = false;
         for (let condition of source.conditions) {
           switch (condition.action) {
@@ -1283,18 +1292,18 @@ function posToOffset(txt, pos) {
 }
 */
 export function wtPlus(params) {
-  if (params.action !== 'AddCIBCategory') {
+  if (params.action !== "AddCIBCategory") {
     if (tb.elText.style.display == "none") {
       alert("Enhanced editor is not supported.\n\nTurning it off to use the extension.");
       tb.elEnhanced.click();
-      console.log( 'wt+')    
+      console.log("wt+");
     }
   }
 
   //Sets all edit variables
   tb.elEnhancedActive = tb.elText.style.display == "none";
   if (tb.elEnhancedActive) {
-    console.log( 'wt+ temp Off')    
+    console.log("wt+ temp Off");
     tb.elEnhanced.click();
 
     //            alert ('Enhanced editor is not supported.<br>Turn it off to use WikiTree+ extension.');
@@ -1317,7 +1326,7 @@ export function wtPlus(params) {
   }
   if (tb.elEnhancedActive) {
     tb.elEnhanced.click();
-    console.log( 'wt+ temp On')    
+    console.log("wt+ temp On");
   }
 
   tb.textBefore = tb.textAll.substring(0, tb.selStart);
@@ -1453,10 +1462,10 @@ function mainEventLoop(event) {
   }
   const op = element.dataset.op;
   const id = element.dataset.id;
-  if (!op.startsWith('onDlgSelectCIB')) {
+  if (!op.startsWith("onDlgSelectCIB")) {
     if (tb.elText.style.display == "none") {
       alert("Enhanced editor is not supported.\n\nTurning it off to use the extension.");
-      console.log( 'Main')    
+      console.log("Main");
       tb.elEnhanced.click();
     }
   }
@@ -1525,7 +1534,7 @@ function initWTPlus() {
   /* Initialization */
   getFeatureOptions("wtplus").then((result) => {
     tb.options = result;
-    console.log(tb.options);
+    //    console.log(tb.options);
   });
   tb.nameSpace = document.title.startsWith("Edit Person ") ? "Profile" : "";
   let w = document.querySelector("h1 > .copyWidget");
@@ -1539,130 +1548,11 @@ function initWTPlus() {
   tb.elSummary = document.getElementById("wpSummary");
   tb.elEnhanced = document.getElementById("toggleMarkupColor");
 
-  document.getElementById("toolbar").insertAdjacentHTML("beforeend", '<dialog id="wtPlusDlg"></dialog><dialog id="wtPlusDlgCIB"></dialog>');
+  document
+    .getElementById("toolbar")
+    .insertAdjacentHTML("beforeend", '<dialog id="wtPlusDlg"></dialog><dialog id="wtPlusDlgCIB"></dialog>');
   tb.elDlg = document.getElementById("wtPlusDlg");
   tb.elDlgCIB = document.getElementById("wtPlusDlgCIB");
-  
 
-  // Loading of template definition From Storage
-  chrome.storage.local.get(["alltemplates"], function (a) {
-    if (a.alltemplates && a.alltemplates.version) {
-      // Is in storage
-      tb.templates = a.alltemplates.templates;
-      tb.cleanup = a.alltemplates.cleanup;
-      if (!tb.cleanup) {
-        tb.cleanup = [];
-      }
-      tb.locations = a.alltemplates.locations;
-      if (!tb.locations) {
-        tb.locations = [];
-      }
-      tb.sources = a.alltemplates.sources;
-      if (!tb.sources) {
-        tb.sources = [];
-      }
-      tb.dataVersion = new Date(a.alltemplates.version);
-      console.log(
-        "Storage: " +
-          tb.dataVersion +
-          ", " +
-          tb.templates.length +
-          " templates" +
-          ", " +
-          tb.cleanup.length +
-          " cleanup" +
-          ", " +
-          tb.locations.length +
-          " locations" +
-          ", " +
-          tb.sources.length +
-          " sources."
-      );
-    } else {
-      // Not in storage
-      tb.dataVersion = new Date("2000-01-01T00:00:00+01:00");
-    }
-    // Loading of template definition From Extension
-    fetch(chrome.runtime.getURL("features/wtPlus/templatesExp.json"))
-      .then((resp) => resp.json())
-      .then((jsonData) => {
-        const d = new Date(jsonData.version);
-        if (d.getTime() > tb.dataVersion.getTime()) {
-          // Extension definition is newer
-          tb.templates = jsonData.templates;
-          tb.cleanup = jsonData.cleanup;
-          if (!tb.cleanup) {
-            tb.cleanup = [];
-          }
-          tb.locations = jsonData.locations;
-          if (!tb.locations) {
-            tb.locations = [];
-          }
-          tb.sources = jsonData.sources;
-          if (!tb.sources) {
-            tb.sources = [];
-          }
-          tb.dataVersion = d;
-          console.log(
-            "Extension: " +
-              tb.dataVersion +
-              ", " +
-              tb.templates.length +
-              " templates." +
-              ", " +
-              tb.cleanup.length +
-              " cleanup." +
-              ", " +
-              tb.locations.length +
-              " locations" +
-              ", " +
-              tb.sources.length +
-              " sources."
-          );
-          chrome.storage.local.set({ alltemplates: jsonData });
-        }
-        if (tb.dataVersion.getTime() < new Date().getTime() - 6 * 3600 * 1000) {
-          // Loading of template definition From Web
-          fetch("https://plus.wikitree.com/chrome/templatesExp.json")
-            .then((resp) => resp.json())
-            .then((jsonData) => {
-              const d = new Date(jsonData.version);
-              if (d.getTime() > tb.dataVersion.getTime()) {
-                // Web definition is newer
-                tb.templates = jsonData.templates;
-                tb.cleanup = jsonData.cleanup;
-                if (!tb.cleanup) {
-                  tb.cleanup = [];
-                }
-                tb.locations = jsonData.locations;
-                if (!tb.locations) {
-                  tb.locations = [];
-                }
-                tb.sources = jsonData.sources;
-                if (!tb.sources) {
-                  tb.sources = [];
-                }
-                tb.dataVersion = d;
-                console.log(
-                  "Web: " +
-                    tb.dataVersion +
-                    ", " +
-                    tb.templates.length +
-                    " templates." +
-                    ", " +
-                    tb.cleanup.length +
-                    " cleanup." +
-                    ", " +
-                    tb.locations.length +
-                    " locations" +
-                    ", " +
-                    tb.sources.length +
-                    " sources."
-                );
-                chrome.storage.local.set({ alltemplates: jsonData });
-              }
-            });
-        }
-      });
-  });
+  dataTablesLoad("wtPlus");
 }

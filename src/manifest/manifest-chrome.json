@@ -1,14 +1,14 @@
 {
   "name": "WikiTree Browser Extension (Preview)",
   "description": "The official WikiTree browser extension.",
-  "version": "1.3.3.0",
+  "version": "1.10.1.13",
   "manifest_version": 3,
   "options_page": "options.html",
-  "permissions": ["storage"],
-  "host_permissions": ["https://www.wikitree.com/*"],
+  "permissions": ["storage", "clipboardRead", "clipboardWrite"],
+  "host_permissions": ["https://*.wikitree.com/*"],
   "content_scripts": [
     {
-      "matches": ["https://www.wikitree.com/*"],
+      "matches": ["https://*.wikitree.com/*"],
       "js": ["js/vendor.js", "js/content.js"]
     }
   ],
@@ -17,7 +17,7 @@
   },
   "web_accessible_resources": [
     {
-      "matches": ["https://www.wikitree.com/*"],
+      "matches": ["https://*.wikitree.com/*"],
       "resources": ["images/*", "features/wtPlus/templatesExp.json", "features/darkMode/darkMode.css", "js/*.js"]
     }
   ],

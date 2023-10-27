@@ -6,9 +6,9 @@ import * as $ from "jquery";
 import "jquery-ui/ui/widgets/draggable";
 import { getRelatives } from "wikitree-js";
 import { createProfileSubmenuLink, extractRelatives, isOK } from "../../core/common";
-import { checkIfFeatureEnabled } from "../../core/options/options_storage";
+import { shouldInitializeFeature } from "../../core/options/options_storage";
 
-checkIfFeatureEnabled("familyTimeline").then((result) => {
+shouldInitializeFeature("familyTimeline").then((result) => {
   if (result) {
     if (result && $("body.profile").length) {
       import("./familyTimeline.css");
@@ -46,7 +46,7 @@ function getTheYear(theDate, ev, person) {
 // Convert a date to YYYY-MM-DD
 function dateToYMD(enteredDate) {
   let enteredD;
-  if (enteredDate.match(/[0-9]{3,4}\-[0-9]{2}\-[0-9]{2}/)) {
+  if (enteredDate.match(/[0-9]{3,4}-[0-9]{2}-[0-9]{2}/)) {
     enteredD = enteredDate;
   } else {
     let eDMonth = "00";
@@ -113,7 +113,7 @@ function getApproxDate(theDate) {
   } else {
     // If we only have the year, assume the date to be July 2 (the midway date)
     const bits = theDate.split("-");
-    if (theDate.match(/00\-00$/) != null) {
+    if (theDate.match(/00-00$/) != null) {
       aDate = bits[0] + "-07-02";
       approx = true;
     } else if (theDate.match(/-00$/) != null) {
@@ -147,7 +147,7 @@ export function titleCase(string) {
   function replacer(match, p1) {
     return "-" + p1.toUpperCase();
   }
-  out = out.replace(/\-([a-z])/, replacer);
+  out = out.replace(/-([a-z])/, replacer);
   return out.trim();
 }
 
@@ -159,10 +159,18 @@ function capitalizeFirstLetter(string) {
   return string.substring(0, 1).toUpperCase() + string.substring(1);
 }
 
-function timeline() {
-  if ($("#timeline").length) {
-    $("#timeline").slideToggle();
-  } else {
+export function timeline(id = false) {
+  let doit = true;
+  if (id) {
+    if ($(".timeline[data-wtid='" + id + "']").length) {
+      $(".timeline[data-wtid='" + id + "']").slideToggle();
+      doit = false;
+    }
+  } else if ($(".timeline").length) {
+    $(".timeline").slideToggle();
+    doit = false;
+  }
+  if (doit) {
     const fields = [
       "BirthDate",
       "BirthLocation",
@@ -195,14 +203,20 @@ function timeline() {
       "Derived.BirthName",
       "Bio",
     ];
-    const id = $("a.pureCssMenui0 span.person").text();
-    getRelatives([id], {
-      getParents: true,
-      getSiblings: true,
-      getSpouses: true,
-      getChildren: true,
-      fields,
-    }).then((personData) => {
+    if (!id) {
+      id = $("a.pureCssMenui0 span.person").text();
+    }
+    getRelatives(
+      [id],
+      {
+        getParents: true,
+        getSiblings: true,
+        getSpouses: true,
+        getChildren: true,
+        fields,
+      },
+      { appId: "WBE_familyTimeline" }
+    ).then((personData) => {
       const person = personData[0];
       const parents = extractRelatives(person.Parents, "Parent");
       const siblings = extractRelatives(person.Siblings, "Sibling");
@@ -219,7 +233,7 @@ function timeline() {
         }
       });
       let familyFacts = [];
-      const startDate = getTheYear(person.BirthDate, "Birth", person);
+      //const startDate = getTheYear(person.BirthDate, "Birth", person);
       // Get all BMD events for each family member
       const bmdEvents = ["Birth", "Death", "marriage"];
       family.forEach(function (aPerson) {
@@ -385,22 +399,22 @@ function timeline() {
         person.FirstName = person.RealName;
       }
       // Make a table
-      const timelineTable = $(
-        `<div class='wrap' id='timeline' data-wtid='${person.Name}'><w>↔</w><x>x</x><table id='timelineTable'>` +
+      const aTimeline = $(
+        `<div class='wrap' class='timeline' data-wtid='${person.Name}'><w>↔</w><x>x</x><table class='timelineTable'>` +
           `<caption>Events in the life of ${person.FirstName}'s family</caption><thead><th class='tlDate'>Date</th>` +
           `<th class='tlBioAge'>Age</th><th class='tlEventDescription'>Event</th><th class='tlEventLocation'>Location</th>` +
-          `</thead></table></div>`
+          `</thead><tbody></tbody></table></div>`
       );
       // Attach the table to the container div
       let theContainer = $("div.container.full-width");
       if (theContainer.prop("id") == "memberSection") {
-        $("#views-wrap").after(timelineTable);
+        $("#views-wrap").after(aTimeline);
       } else {
-        timelineTable.prependTo(theContainer);
+        aTimeline.prependTo(theContainer);
       }
       if ($("#connectionList").length) {
-        timelineTable.prependTo($("#content"));
-        timelineTable.css({ top: window.pointerY - 30, left: 10 });
+        aTimeline.prependTo($("#content"));
+        aTimeline.css({ top: window.pointerY - 30, left: 10 });
       }
       let bpDead = false;
       let bpDeadAge;
@@ -511,25 +525,26 @@ function timeline() {
         const tlTR = $(
           "<tr class='" + classText + "'>" + tlDate + tlBioAge + tlEventDescription + tlEventLocation + "</tr>"
         );
-        $("#timelineTable").append(tlTR);
+        aTimeline.find("tbody").append(tlTR);
         if (aFact.evnt == "Death" && aFact.wtId == person.Name) {
           bpDead = true;
           bpDeadAge = bpAgeAtEvent;
         }
       });
-
-      $("#timeline").slideDown("slow");
-      $("#timeline x").click(function () {
-        $("#timeline").slideUp();
+      aTimeline.show();
+      aTimeline.slideDown("slow");
+      aTimeline.find("x").on("click", function () {
+        aTimeline.slideUp();
       });
-      $("#timeline w").click(function () {
-        $("#timeline").toggleClass("wrap");
+      aTimeline.find("w").on("click", function () {
+        aTimeline.toggleClass("wrap");
       });
       // Use jquery-ui to make the table draggable
-      $("#timeline").draggable();
-      $("#timeline").dblclick(function () {
+      aTimeline.draggable();
+      aTimeline.on("dblclick", function () {
         $(this).slideUp("swing");
       });
+      aTimeline.addClass("timeline");
     });
   }
 }

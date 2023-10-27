@@ -11,3 +11,14 @@ dist
 *_testout.txt
 .eslintrc.js
 .vscode/settings.json
+.vscode/tasks.json
+*.zip
+
+# WinMerge backups
+*.bak
+
+# generated during build process
+public/features/wtPlus/templatesExp.json
+
+# Windows file system links
+*.lnk

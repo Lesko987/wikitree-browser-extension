@@ -1,13 +1,24 @@
 # WikiTree Browser Extension
 
 [![Build and test](https://github.com/wikitree/wikitree-browser-extension/actions/workflows/test.yml/badge.svg)](https://github.com/wikitree/wikitree-browser-extension/actions/workflows/test.yml)
-[![Build and test](https://img.shields.io/chrome-web-store/v/ijipjpbjobecdgkkjdfpemcidfdmnkid?logo=Google%20Chrome&logoColor=%23aaa)](https://chrome.google.com/webstore/detail/wikitree-browser-extensio/ijipjpbjobecdgkkjdfpemcidfdmnkid)
+[![preview-release](https://img.shields.io/chrome-web-store/v/ijipjpbjobecdgkkjdfpemcidfdmnkid?logo=Google%20Chrome&logoColor=%23aaa)](https://chrome.google.com/webstore/detail/wikitree-browser-extensio/ijipjpbjobecdgkkjdfpemcidfdmnkid)
+[![stable-release](https://img.shields.io/chrome-web-store/v/ncjafpiokcjepnnlmgdaphkkjehapbln?logo=Google%20Chrome&logoColor=%23aaa)](https://chrome.google.com/webstore/detail/wikitree-browser-extensio/ncjafpiokcjepnnlmgdaphkkjehapbln)
+
+## Installation for end users
+
+The latest version can be downloaded from your browser's app store:
+
+- [Chrome](https://chrome.google.com/webstore/detail/wikitree-browser-extensio/ncjafpiokcjepnnlmgdaphkkjehapbln)
+- [Firefox](https://addons.mozilla.org/en-US/firefox/addon/wikitree-browser-extension/)
+- [Safari](https://apps.apple.com/us/app/wikitree-browser-extension/id6447643999) (iOS and Mac)
 
 ## Installation for testers
 
 To test the extension you can:
 
-- download the latest [wikitree-browser-extension.zip](https://github.com/wikitree/wikitree-browser-extension/releases/download/latest/wikitree-browser-extension.zip),
+- download the latest zip for your browser:
+  - [stable version](https://github.com/wikitree/wikitree-browser-extension/releases/tag/stable)
+  - [preview version](https://github.com/wikitree/wikitree-browser-extension/releases/tag/preview)
 - unpack it somewhere on your computer,
 - Go to [chrome://extensions](chrome://extensions),
 - Make sure you have _Developer mode_ turned on (top right corner),

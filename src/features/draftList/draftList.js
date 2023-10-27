@@ -3,10 +3,10 @@ Created By: Ian Beacall (Beacall-6)
 */
 
 import $ from "jquery";
-import { isOK, showDraftList, updateDraftList } from "../../core/common";
-import { checkIfFeatureEnabled } from "../../core/options/options_storage";
+import { showDraftList, updateDraftList } from "../../core/common";
+import { shouldInitializeFeature } from "../../core/options/options_storage";
 
-checkIfFeatureEnabled("draftList").then((result) => {
+shouldInitializeFeature("draftList").then((result) => {
   if (result) {
     import("./draftList.css");
     // Check that WikiTree BEE hasn't added this already

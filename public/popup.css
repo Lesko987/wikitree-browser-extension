@@ -1,0 +1,7 @@
+body {
+  background-color: #f7f6f0;
+}
+
+#errorMessage {
+  color: #c00;
+}

@@ -6,7 +6,105 @@ import $ from "jquery";
 import "./g2g_.css";
 import { isOK } from "../../core/common";
 import Cookies from "js-cookie";
-import { checkIfFeatureEnabled, getFeatureOptions } from "../../core/options/options_storage";
+import { shouldInitializeFeature, getFeatureOptions } from "../../core/options/options_storage";
+
+function text2Link(element, text, link) {
+  const childNodes = element.childNodes;
+  let modifiedNodes = [];
+
+  for (let i = 0; i < childNodes.length; i++) {
+    if (childNodes[i].nodeType === 3) {
+      const nodeText = childNodes[i].textContent;
+
+      if (nodeText.includes(text)) {
+        const textSegments = nodeText.split(text);
+
+        const nodesWithLinks = textSegments.flatMap((segment, index) => {
+          const clonedLink = link.cloneNode(true);
+          const textNode = document.createTextNode(segment);
+
+          return index < textSegments.length - 1 ? [textNode, clonedLink] : [textNode];
+        });
+
+        modifiedNodes.push(...nodesWithLinks);
+      } else {
+        modifiedNodes.push(childNodes[i]);
+      }
+    } else {
+      modifiedNodes.push(childNodes[i]);
+    }
+  }
+
+  return modifiedNodes;
+}
+
+function linkify() {
+  const posts = document.querySelectorAll('div[itemprop="text"]');
+
+  let allElements = [];
+  posts.forEach((post) => {
+    allElements.push(post);
+    const paragraphs = post.querySelectorAll("p");
+    if (paragraphs.length > 0) {
+      paragraphs.forEach((paragraph) => {
+        allElements.push(paragraph);
+        const strongElements = paragraph.querySelectorAll("strong");
+        if (strongElements.length > 0) {
+          strongElements.forEach((strongElement) => {
+            allElements.push(strongElement);
+          });
+        }
+        const spanElements = paragraph.querySelectorAll("span");
+        if (spanElements.length > 0) {
+          spanElements.forEach((spanElement) => {
+            allElements.push(spanElement);
+          });
+        }
+      });
+    }
+  });
+
+  const excludeList = [/\bpre-\d{4}/i, /\bpost-\d{4}/i, /COVID-19/i];
+
+  /* Regex explanation:
+1. The first three lookaheads check that the string contains between 0 and 3 dashes, between 0 and 2 underscores, and between 0 and 1 apostrophes, respectively.
+2. The fourth lookahead checks that there is at least one letter between A and Z, or between À and ž.
+3. The final part checks for a hyphen and a number of up to 6 digits. */
+  const regexPattern =
+    /\b(?=(?:[^-\n]*-){0,3}[^-\n]*$)(?=(?:[^_\n]*_){0,2}[^_\n]*$)(?=(?:[^'\n]*'){0,1}[^'\n]*$)(?=.*[A-ZÀ-ž])[A-Za-zÀ-ž_\-']+-\d{1,6}\b/g;
+
+  allElements.forEach((element) => {
+    const childNodes = element.childNodes;
+
+    childNodes.forEach((childNode, j) => {
+      if (childNode.nodeType === 3) {
+        const nodeText = childNode.textContent;
+        let matches = nodeText.match(regexPattern);
+        matches = [...new Set(matches)];
+        matches = matches.filter((match) => !excludeList.some((regex) => regex.test(match)));
+        const matchCount = matches.length;
+
+        if (matches && matchCount > 0) {
+          matches.forEach((match) => {
+            const link = document.createElement("a");
+            link.href = "https://wikitree.com/wiki/" + match;
+            link.textContent = match;
+            link.className = "WBE_G2G_WTID_link";
+            const currentElement = element;
+            const modifiedElement = currentElement.cloneNode(true);
+            const modifiedNodes = text2Link(modifiedElement, match, link);
+            currentElement.innerHTML = "";
+            modifiedNodes.forEach((modifiedNode) => {
+              const clonedNode = modifiedNode.cloneNode(true);
+              currentElement.appendChild(clonedNode);
+            });
+          });
+        }
+        delete window.matches;
+      }
+    });
+  });
+}
 
 async function initG2G() {
   const options = await getFeatureOptions("g2g");
@@ -38,9 +136,12 @@ async function initG2G() {
   if (options.pageLinks) {
     g2gPageLinksAtTop();
   }
+  if (options.linkify) {
+    linkify();
+  }
 }
 
-checkIfFeatureEnabled("g2g").then((result) => {
+shouldInitializeFeature("g2g").then((result) => {
   if (result && $(".qa-body-wrapper").length) {
     import("./g2g.css");
     initG2G();
@@ -64,12 +165,12 @@ function g2gScissors() {
     const g2gIDmatch = url.match(/\/([0-9]{1,8})\//);
     if (g2gIDmatch != null) {
       window.g2gID = g2gIDmatch[1];
-      const g2gURL = "https://www.wikitree.com/g2g/" + g2gID;
+      const g2gURL = "https://www.wikitree.com/g2g/" + window.g2gID;
       const g2gQuestion = $(".qa-main-heading h1").text();
       $(".qa-sidepanel").prepend(
         $(
           '<span id="g2gScissors"><button aria-label="Copy ID" title="Copy ID" data-copy-label="Copy ID" class="copyWidget" data-copy-text="' +
-            g2gID +
+            window.g2gID +
             '" style="color:#8fc641;"><img src="/images/icons/scissors.png">ID</button><button aria-label="Copy URL" title="Copy URL" data-copy-label="Copy URL" class="copyWidget" data-copy-text="' +
             g2gURL +
             '" style="color:#8fc641;">/URL</button><button aria-label="Copy Question" title="Copy Question" data-copy-label="Copy Question" class="copyWidget" data-copy-text="' +
@@ -158,7 +259,6 @@ function addWikiIDGoBox() {
 
     $("#wtIDgo_go").on("click", function (ev) {
       ev.preventDefault();
-      const wtID = $("#wtIDgo_id");
       const thisValue = $("#wtIDgo_id").val().trim();
       if (thisValue.match(/[0-9]/) == null) {
         window.location = "https://www.wikitree.com/genealogy/" + thisValue;

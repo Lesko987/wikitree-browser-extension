@@ -7,9 +7,9 @@ import "jquery-ui/ui/widgets/draggable";
 import { getRelatives } from "wikitree-js";
 import { createProfileSubmenuLink, familyArray, isOK, htmlEntities } from "../../core/common";
 
-import { checkIfFeatureEnabled } from "../../core/options/options_storage";
+import { shouldInitializeFeature } from "../../core/options/options_storage";
 
-checkIfFeatureEnabled("familyGroup").then((result) => {
+shouldInitializeFeature("familyGroup").then((result) => {
   if (result && $("body.profile").length) {
     import("../familyTimeline/familyTimeline.css");
     // Add a link to the short list of links below the tabs
@@ -90,18 +90,29 @@ export function ymdFix(date) {
   return outDate;
 }
 
+let zIndexCounter = 1000; // Initial z-index value
+
+export function incrementZIndex(jqObject) {
+  zIndexCounter++;
+  jqObject.css("z-index", zIndexCounter);
+}
+
 export async function showFamilySheet(theClicked, profileID) {
   // If the table already exists toggle it.
   if ($("#" + profileID.replace(" ", "_") + "_family").length) {
     $("#" + profileID.replace(" ", "_") + "_family").fadeToggle();
   } else {
     // Make the table and do other things
-    getRelatives([profileID], {
-      getParents: true,
-      getSiblings: true,
-      getSpouses: true,
-      getChildren: true,
-    }).then((person) => {
+    getRelatives(
+      [profileID],
+      {
+        getParents: true,
+        getSiblings: true,
+        getSpouses: true,
+        getChildren: true,
+      },
+      { appId: "WBE_familyGroup" }
+    ).then((person) => {
       const uPeople = familyArray(person[0]);
       // Make the table
       const familyTable = peopleToTable(uPeople);
@@ -110,10 +121,13 @@ export async function showFamilySheet(theClicked, profileID) {
       familyTable.attr("id", profileID.replace(" ", "_") + "_family");
       familyTable.draggable();
       familyTable.fadeIn();
+      incrementZIndex(familyTable);
       familyTable.on("dblclick", function () {
         $(this).fadeOut();
+        incrementZIndex(familyTable);
       });
       let theLeft;
+      console.log(theClicked);
       if ($("div.ten.columns").length) {
         theLeft = getOffset($("div.ten.columns")[0]).left;
         familyTable.css({
@@ -148,12 +162,12 @@ export async function showFamilySheet(theClicked, profileID) {
         }
       });
 
-      $(".familySheet x").unbind();
-      $(".familySheet x").on("click", function () {
+      // Event delegation for closing and wrapping
+      $(document).on("click", ".familySheet x", function () {
         $(this).parent().fadeOut();
       });
-      $(".familySheet w").unbind();
-      $(".familySheet w").on("click", function () {
+
+      $(document).on("click", ".familySheet w", function () {
         $(this).parent().toggleClass("wrap");
       });
     });
@@ -232,7 +246,7 @@ export function peopleToTable(kPeople) {
           "<tr data-name='" +
             kPers.Name +
             "' data-birthdate='" +
-            bDate.replaceAll(/\-/g, "") +
+            bDate.replaceAll(/-/g, "") +
             "' data-relation='" +
             kPers.Relation +
             "' class='" +
@@ -342,8 +356,7 @@ export function displayName(fPerson) {
               fName3 += "(" + fPerson["LastNameAtBirth"] + ") ";
             }
           } else if (dCheck == "RealName") {
-            if (typeof fPerson["FirstName"] != "undefined") {
-            } else {
+            if (!(typeof fPerson["FirstName"] != "undefined")) {
               fName3 += fPerson["RealName"] + " ";
             }
           } else {

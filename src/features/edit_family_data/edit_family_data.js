@@ -4,10 +4,10 @@ Created By: Ian Beacall (Beacall-6)
 
 import * as $ from "jquery";
 import { getPerson } from "wikitree-js";
-import { checkIfFeatureEnabled } from "../../core/options/options_storage";
+import { shouldInitializeFeature, getFeatureOptions } from "../../core/options/options_storage";
 import { isOK } from "../../core/common";
 
-checkIfFeatureEnabled("editFamilyData").then((result) => {
+shouldInitializeFeature("editFamilyData").then((result) => {
   if (
     result &&
     $("body.page-Special_EditFamily,body.page-Special_EditFamilySteps").length &&
@@ -21,7 +21,7 @@ checkIfFeatureEnabled("editFamilyData").then((result) => {
 async function addInfoAboutOtherPerson() {
   const uIDbutton = $("h1 > button").first();
   const uID = uIDbutton.attr("data-copy-text");
-  getPerson(uID).then((data) => {
+  getPerson(uID, undefined, { appId: "WBE_edit_family_data" }).then((data) => {
     const efProfile = data;
     let efBdate = "";
     let efBlocation = "";
@@ -49,5 +49,32 @@ async function addInfoAboutOtherPerson() {
         $("h1").append(efHTML);
       }
     }
+    getFeatureOptions("editFamilyData").then((options) => {
+      if (options.patronymic) {
+        if ($("#mLastNameAtBirth").val()) {
+          if (
+            $("#mLastNameAtBirth")
+              .val()
+              .match(/^ap\s[a-z]/i) &&
+            efProfile.FirstName &&
+            $("h1")
+              .text()
+              .match(/Edit|Add child of/i)
+          ) {
+            $("#mLastNameAtBirth").val("ap " + efProfile.FirstName);
+            $("#mGender").on("change", function () {
+              if ($("#mGender").val() == "Male" && $("#mLastNameAtBirth").val() == "ferch " + efProfile.FirstName) {
+                $("#mLastNameAtBirth").val("ap " + efProfile.FirstName);
+              } else if (
+                $("#mGender").val() == "Female" &&
+                $("#mLastNameAtBirth").val() == "ap " + efProfile.FirstName
+              ) {
+                $("#mLastNameAtBirth").val("ferch " + efProfile.FirstName);
+              }
+            });
+          }
+        }
+      }
+    });
   });
 }

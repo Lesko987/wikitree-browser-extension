@@ -3,7 +3,7 @@ Created By: Ian Beacall (Beacall-6)
 */
 
 import $ from "jquery";
-import { checkIfFeatureEnabled } from "../../core/options/options_storage";
+import { shouldInitializeFeature } from "../../core/options/options_storage";
 
 function getBirthplaces() {
   const ids = [];
@@ -31,7 +31,7 @@ function getBirthplaces() {
     });
     while (ids.length) {
       let chunk = ids.splice(0, 100).join(",");
-      getPeople(chunk, 0, 0, 0, 0, 0, "Id,Name,BirthLocation").then((data) => {
+      getPeople(chunk, 0, 0, 0, 0, 0, "Id,Name,BirthLocation", "WBE_dna_table").then((data) => {
         let theKeys = Object.keys(data[0].people);
         theKeys.forEach(function (aKey) {
           let person = data[0].people[aKey];
@@ -87,7 +87,7 @@ function getBirthplaces() {
   }, 3000);
 }
 
-checkIfFeatureEnabled("dnaTable").then((result) => {
+shouldInitializeFeature("dnaTable").then((result) => {
   if (result && $("body.page-Special_DNATests").length) {
     import("./dna_table.css");
     $("table.wt.names").addClass("wbe");
@@ -102,17 +102,10 @@ checkIfFeatureEnabled("dnaTable").then((result) => {
   }
 });
 
-export async function getPeople(keys, siblings, ancestors, descendants, nuclear, minGeneration, fields) {
-  try {
-    const result = await $.ajax({
-      url: "https://api.wikitree.com/api.php",
-      crossDomain: true,
-      xhrFields: {
-        withCredentials: true,
-      },
-      type: "POST",
-      dataType: "json",
-      data: {
+export async function getPeople(keys, siblings, ancestors, descendants, nuclear, minGeneration, fields, appId = "WBE") {
+  if (keys.length) {
+    try {
+      const data = {
         action: "getPeople",
         keys: keys,
         siblings: siblings,
@@ -121,10 +114,32 @@ export async function getPeople(keys, siblings, ancestors, descendants, nuclear,
         nuclear: nuclear,
         minGeneration: minGeneration,
         fields: fields,
-      },
-    });
-    return result;
-  } catch (error) {
-    console.error(error);
+        getSpouses: 1,
+        appId: appId || "WBE",
+      };
+      // Remove all empty values
+      Object.keys(data).forEach((key) => {
+        if (data[key] === undefined || data[key] === null || data[key] === "") {
+          delete data[key];
+        }
+      });
+
+      const result = await $.ajax({
+        url: "https://api.wikitree.com/api.php",
+        crossDomain: true,
+        xhrFields: {
+          withCredentials: true,
+        },
+        type: "POST",
+        dataType: "json",
+        data: data,
+      });
+      return result;
+    } catch (error) {
+      console.error(error);
+      return {};
+    }
+  } else {
+    return {};
   }
 }

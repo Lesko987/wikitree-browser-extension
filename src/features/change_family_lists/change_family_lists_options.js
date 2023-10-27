@@ -1,5 +1,6 @@
 /*
 Created By: Ian Beacall (Beacall-6)
+Contributors: Jonathan Duke (Duke-5773)
 */
 
 import { isProfilePage } from "../../core/pageType";
@@ -11,7 +12,7 @@ const changeFamilyLists = {
   description: "Change the position and/or appearance of family lists (parents, siblings, spouses, and children)",
   category: "Profile",
   creators: [{ name: "Ian Beacall", wikitreeid: "Beacall-6" }],
-  contributors: [],
+  contributors: [{ name: "Jonathan Duke", wikitreeid: "Duke-5773" }],
   defaultValue: false,
   pages: [isProfilePage],
 
@@ -23,9 +24,27 @@ const changeFamilyLists = {
       defaultValue: false,
     },
     {
+      id: "showSidebarHeading",
+      type: OptionType.CHECKBOX,
+      label: "Add heading when displayed on the right",
+      defaultValue: false,
+    },
+    {
       id: "verticalLists",
       type: OptionType.CHECKBOX,
       label: "Vertical family lists with dates",
+      defaultValue: false,
+    },
+    {
+      id: "moveToEnd",
+      type: OptionType.CHECKBOX,
+      label: "Re-order: Born, Died, Family Relationships",
+      defaultValue: false,
+    },
+    {
+      id: "highlightActiveProfile",
+      type: OptionType.CHECKBOX,
+      label: "Highlight the active profile when listed vertically",
       defaultValue: false,
     },
     {
@@ -34,6 +53,18 @@ const changeFamilyLists = {
       label:
         "'Parents:', 'Siblings:', 'Spouses:', and 'Children:' instead of " +
         "'Son/Daughter of', 'Brother/Sister of', 'Husband/Wife of', and 'Father/Mother of'",
+      defaultValue: false,
+    },
+    {
+      id: "parentAges",
+      type: OptionType.CHECKBOX,
+      label: "Add ages of parents",
+      defaultValue: false,
+    },
+    {
+      id: "ageDifferences",
+      type: OptionType.CHECKBOX,
+      label: "Add age differences with siblings and children",
       defaultValue: false,
     },
     {

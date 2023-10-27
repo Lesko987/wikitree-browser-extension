@@ -5,15 +5,13 @@ Created By: Ian Beacall (Beacall-6)
 import $ from "jquery";
 import "jquery-ui/ui/widgets/draggable";
 import { extractRelatives, displayName } from "../../core/common";
-import { checkIfFeatureEnabled } from "../../core/options/options_storage";
+import { shouldInitializeFeature } from "../../core/options/options_storage";
 
-checkIfFeatureEnabled("verifyID").then((result) => {
+shouldInitializeFeature("verifyID").then((result) => {
   if (result) {
     if ($("body.page-Special_EditFamily,body.page-Special_EditFamilySteps").length) {
       import("./verifyID.css");
       checkAttachPersonID();
-      // Try not to clash with BEE
-      $("body").addClass("verifyID");
     }
   }
 });
@@ -128,13 +126,9 @@ async function checkAttachPersonID() {
   $("body.page-Special_EditFamily #mName,body.page-Special_EditFamilySteps #mName").on("keyup", function () {
     $("#verification").remove();
     if (window.timeoutId) {
-      clearTimeout(timeoutId);
+      clearTimeout(window.timeoutId);
     }
-    if (
-      $(this)
-        .val()
-        .match(/.+\-.+/)
-    ) {
+    if ($(this).val().match(/.+-.+/)) {
       const theKey = $(this).val();
       window.timeoutId = setTimeout(function () {
         $.ajax({
@@ -151,14 +145,16 @@ async function checkAttachPersonID() {
             getChildren: "0",
             keys: theKey,
             fields: "*",
+            appId: "WBE_verifyID",
           },
           success: function (data) {
+            $("#verification").remove();
             let ah2 = $("<h3>?</h3>");
             let aUL = $("<ul></ul>");
             if (data[0]?.items) {
               let person = data[0].items[0].person;
               person = addRelativeArraysToPerson(person);
-              $("#mName").after($("<div id='verification'><x>x</x></div>"));
+              $("#mName").after($(`<div id='verification'><x>x</x><span id="wtid">${person.Name}</span></div>`));
               $("#verification").draggable();
               if (person.Created) {
                 ah2 = $(
@@ -202,11 +198,11 @@ async function checkAttachPersonID() {
               aUL = $("<ul></ul>");
             }
             $("#verification").prepend(aUL).prepend(ah2);
-            $("#verification").dblclick(function () {
+            $("#verification").on("dblclick", function () {
               $(this).fadeOut();
             });
-            $("#verification x").click(function () {
-              $("#verification").fadeOut();
+            $("#verification x").on("click", function () {
+              $(this).parent().fadeOut();
             });
           },
         });

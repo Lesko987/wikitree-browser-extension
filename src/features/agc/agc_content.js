@@ -26,7 +26,11 @@ SOFTWARE.
 Created By: Rob Pavey (Pavey-429)
 */
 
-import { checkIfFeatureEnabled, getFeatureOptions } from "../../core/options/options_storage"
+import { WBE } from "../../core/common";
+import { shouldInitializeFeature, getFeatureOptions } from "../../core/options/options_storage";
+
+const undoImageURL = chrome.runtime.getURL("images/agc_undo.png");
+const agcImageURL = chrome.runtime.getURL("images/agc.png");
 
 // file level variables
 var agcButton = undefined;
@@ -79,23 +83,7 @@ function asyncLoadScriptAndCallEditBio(editBioInput, sendResponse) {
 }
 
 async function useModuleToEditBio(editBioInput, callback) {
-  // This is a bit kludgy, in Chrome MV3 there is no background script so the sendMessage
-  // will always set lastError.
-  try {
-    chrome.runtime.sendMessage({ type: "doEditBio", editBioInput: editBioInput }, function (response) {
-      if (chrome.runtime.lastError) {
-        // possibly there is no content script loaded, bring up default menu for unknown pages
-        //console.log("No response from doEditBioMessage in useModuleToEditBio");
-        asyncLoadScriptAndCallEditBio(editBioInput, callback);
-      } else {
-        // This must be Firefox or Safari since the sendMessage succeeded.
-        callback(response);
-      }
-    });
-  } catch (error) {
-    //console.log("useModuleToEditBio caught error");
-    asyncLoadScriptAndCallEditBio(editBioInput, callback);
-  }
+  asyncLoadScriptAndCallEditBio(editBioInput, callback);
 }
 
 function checkForGedcomCreatedProfile() {
@@ -237,9 +225,9 @@ function getParentsFromDocument(document, parents) {
 async function updateButton() {
   if (agcButton != undefined) {
     if (isBioEdited) {
-      agcButton.src = chrome.runtime.getURL("images/agc_undo.png");
+      agcButton.src = undoImageURL;
     } else {
-      agcButton.src = chrome.runtime.getURL("images/agc.png");
+      agcButton.src = agcImageURL;
     }
   }
 }
@@ -281,6 +269,8 @@ function displayErrorDialog(editBioMessage) {
   toastInfo.ariaLive = "polite";
   //toastInfo.setAttribute("style", "display: block;");
   //toastInfo.style = "display: block;";
+  toastInfo.style = "z-index: 10000000 !important;";
+
   toastInfo.style.display = "block";
   toastContainer.appendChild(toastInfo);
 
@@ -425,8 +415,7 @@ async function doEditBio() {
         document.getElementById("mMiddleName").value = editBioOutput.middleName;
       }
 
-      const extensionVersion = chrome.runtime.getManifest().version;
-      const changeSummary = "Reformatted by the WikiTreeAGC extension version " + extensionVersion;
+      const changeSummary = "Reformatted by the WikiTreeAGC extension version " + WBE.version;
 
       // Let the page know that changes have been made so that the "Save Changes" button works
       var inputEvent = new Event("input", { bubbles: true });
@@ -511,7 +500,6 @@ function onButtonClicked() {
   }
 }
 
-
 function initAgc() {
   // We only create the toolbar button if this looks like a profile gerenated by GEDCOMpare.
   if (checkForGedcomCreatedProfile()) {
@@ -519,10 +507,10 @@ function initAgc() {
 
     agcButton = document.createElement("img");
     agcButton.className = "mw-toolbar-editbutton";
-    agcButton.src = chrome.runtime.getURL("images/agc.png");
+    agcButton.src = agcImageURL;
     agcButton.border = "0";
-    agcButton.alt = "Ancestry GEDCOM Cleanup";
-    agcButton.title = "Ancestry GEDCOM Cleanup";
+    agcButton.alt = "Automatic GEDCOM Cleanup";
+    agcButton.title = "Automatic GEDCOM Cleanup";
     agcButton.style = "cursor: pointer;";
 
     // This adds it on the left side of the toolbar
@@ -532,7 +520,7 @@ function initAgc() {
   }
 }
 
-checkIfFeatureEnabled("agc").then((result) => {
+shouldInitializeFeature("agc").then((result) => {
   if (result) {
     initAgc();
   }

@@ -4,9 +4,9 @@ Created By: Ian Beacall (Beacall-6)
 
 import * as $ from "jquery";
 import Cookies from "js-cookie";
-import { checkIfFeatureEnabled } from "../../core/options/options_storage";
+import { shouldInitializeFeature } from "../../core/options/options_storage";
 
-checkIfFeatureEnabled("sortBadges").then((result) => {
+shouldInitializeFeature("sortBadges").then((result) => {
   if (result && $("a.pureCssMenui0 span.person").text() == Cookies.get("wikitree_wtb_UserName")) {
     import("./sortBadges.css");
     const queryString = window.location.search;
@@ -25,7 +25,7 @@ checkIfFeatureEnabled("sortBadges").then((result) => {
       });
       $("#moveClubBadgesDown").on("click", (e) => {
         e.preventDefault();
-        moveClubBadgesDown();
+        moveClubBadgesDown(e);
       });
 
       if (localStorage.savedBadges) {
@@ -68,15 +68,19 @@ function hideClubBadges() {
   saveBadgeChanges();
 }
 
-function moveClubBadgesDown() {
+function moveClubBadgesDown(e) {
+  e.preventDefault();
   const clubBadgeLinks = $("a[href$='club100'],a[href$='club1000']");
   clubBadgeLinks.each(function () {
     $(this).closest("li").appendTo($(this).closest("ul"));
+    $(this).closest("li").find("input[name^='hide']").prop("checked", "true");
   });
-  const idArray = [];
-  $("#list_items li").each(function () {
-    idArray.push($(this).attr("id"));
-  });
-  $("#new_order").val(idArray.join(","));
-  saveBadgeChanges();
+  setTimeout(() => {
+    const idArray = [];
+    $("#list_items li").each(function () {
+      idArray.push($(this).attr("id"));
+    });
+    $("#new_order").val(idArray.join(","));
+    saveBadgeChanges();
+  }, 1000);
 }

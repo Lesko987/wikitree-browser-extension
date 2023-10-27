@@ -327,6 +327,12 @@ body.darkMode .vertical .nameList li.spouse_51 {
   grid-template-areas: "name dates";
 }
 
+.vertical span[itemprop="spouse"].hasRelAge {
+  display: grid;
+  grid-template-columns: 5fr 2.3fr 1fr;
+  grid-template-areas: "name dates age";
+}
+
 .vertical span[itemprop="spouse"].vanilla {
   display: inline;
   margin: auto;
@@ -338,6 +344,12 @@ body.darkMode .vertical .nameList li.spouse_51 {
 
 .vertical .spouseDates {
   grid-area: dates;
+}
+
+.vertical span[itemprop="spouse"] span.relAge {
+  grid-area: age;
+  font-size: smaller;
+  text-align: right;
 }
 
 .vertical .marriageDetails {
@@ -451,7 +463,7 @@ body.darkMode .vertical .nameList li.spouse_51 {
   padding: 2px;
   border-radius: 1em;
   z-index: 9000;
-  right: 3px;
+  right: 2em;
   top: 0;
 }
 
@@ -467,9 +479,9 @@ body.darkMode .vertical .nameList li {
 }
 
 .vertical .nameList li.parent_1,
-.vertical .nameList li span.bdDates.parent_1,
+.vertical .nameList li span[itemprop="sibling"].parent_1,
 body.darkMode .vertical .nameList li.parent_1,
-body.darkMode .vertical .nameList span.bdDates.parent_1 {
+body.darkMode .vertical .nameList span[itemprop="sibling"].parent_1 {
   border-right: 3px solid indigo;
 }
 
@@ -483,23 +495,29 @@ body.darkMode .vertical .nameList span.bdDates.parent_2 {
   background: none;
 }
 
-.vertical .nameList li[data-father] {
+.vertical .nameList li:not([id*="Unknown"]):not(.x-edit),
+.vertical .spouseDetails > span:first-of-type {
   background-color: #efe;
   border-left: 5px green solid;
+}
+
+.x-cfl-highlight-active .vertical .nameList #profilePerson {
+  background-color: #fff5e0 !important;
+  border-left: 5px #fcb815 solid !important;
 }
 
 .vertical .nameList li[data-gender="female"],
 .vertical .nameList span[data-gender="Female"],
 .vertical .spouseDetails span[data-gender="Female"] {
-  background-color: #fee;
-  border-left: 5px pink solid;
+  background-color: #fee !important;
+  border-left: 5px pink solid !important;
 }
 
 .vertical .nameList li[data-gender="male"],
 .vertical .nameList span[data-gender="Male"],
 .vertical .spouseDetails span[data-gender="Male"] {
-  background-color: #eef;
-  border-left: 5px blue solid;
+  background-color: #eef !important;
+  border-left: 5px blue solid !important;
 }
 
 .clickable {
@@ -556,6 +574,14 @@ body.darkMode .vertical .nameList span.bdDates.parent_2 {
   grid-template-areas: "name dates";
 }
 
+.vertical .nameList.hasRelAge li span[itemprop="sibling"],
+.vertical .nameList.hasRelAge li span[itemprop="children"],
+.vertical .nameList.hasRelAge li span[itemprop="parent"] {
+  display: grid;
+  grid-template-columns: 5fr 2.3fr 1fr;
+  grid-template-areas: "name dates age";
+}
+
 .vertical #parentList,
 .vertical #siblingsUnknown {
   list-style: none;
@@ -569,6 +595,16 @@ body.darkMode .vertical .nameList span.bdDates.parent_2 {
 .vertical .bdDates {
   grid-area: dates;
   font-size: smaller;
+}
+
+div.familyList span.relAge {
+  font-size: smaller;
+}
+
+.vertical div.familyList li span.relAge {
+  grid-area: age;
+  font-size: smaller;
+  text-align: right;
 }
 
 .vertical a:link.activeProfile,
@@ -607,11 +643,36 @@ body.darkMode .vertical .nameList span.bdDates.parent_2 {
 .vertical .nameList li {
   position: relative;
 }
-.vertical img.dnaConfirmed {
+.vertical :not(a) > img[src*="DNA-confirmed"],
+.vertical a[href*="Confirmed_with_DNA"] {
   position: absolute;
-  left: -2.1em;
-  top: 0.3em;
+  left: -44px;
+  top: 4px;
 }
 .vertical ol {
   clear: both;
+}
+
+#nVitals .sidebar-heading {
+  display: none;
+}
+.x-cfl-show-heading .columns.six #nVitals .sidebar-heading {
+  display: block;
+}
+@media only print {
+  .print-content-only #nVitals .sidebar-heading {
+    display: block;
+    font-size: 1.7143em;
+    line-height: 1.75em;
+    margin-top: 1em;
+    margin-left: 0;
+  }
+
+  .print-content-only #nVitals.vertical a > span {
+    display: inline-block;
+  }
+
+  .print-content-only #nVitals.vertical .dataStatus {
+    font-size: 8pt;
+  }
 }

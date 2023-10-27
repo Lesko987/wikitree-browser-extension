@@ -4,34 +4,28 @@ Created By: Ian Beacall (Beacall-6)
 
 import $ from "jquery";
 import "jquery-ui/ui/widgets/sortable";
-import { checkIfFeatureEnabled, getFeatureOptions } from "../../core/options/options_storage";
-import { isOK, htmlEntities, showDraftList } from "../../core/common";
-import { getRandomProfile, addRandomProfileLocationBox } from "../randomProfile/randomProfile";
-import { getPerson } from "wikitree-js";
+import { shouldInitializeFeature, getFeatureOptions } from "../../core/options/options_storage";
+import { isOK, htmlEntities, showDraftList, treeImageURL } from "../../core/common";
+import {
+  goToRandomProfile,
+  addRandomProfileLocationBox,
+  goToRandomWatchlistProfile,
+} from "../randomProfile/randomProfile";
+import { doWhatLinksHere } from "../what_links_here/what_links_here";
 
-checkIfFeatureEnabled("myMenu").then((result) => {
+shouldInitializeFeature("myMenu").then((result) => {
   if (result) {
     import("./my_menu.css");
+    const profileWTID = $("a.pureCssMenui0 span.person").text();
+    window.profileWTID = profileWTID;
     addCustomMenu();
+    if (!window.randomProfileOptions) {
+      window.randomProfileOptions = getFeatureOptions("randomProfile");
+    }
   }
 });
 
 // My Menu functions
-
-function addTypeOfSuggestion() {
-  setTimeout(function () {
-    $("#customMenu li[data-menu='My_WikiTree'] a:contains(Suggestions)").each(function () {
-      if ($(this).find(".addedText").length == 0) {
-        $(this).append($("<added class='addedText'>WL</added>"));
-      }
-    });
-    $("#customMenu li[data-menu!='My_WikiTree'] a:contains(Suggestions)").each(function () {
-      if ($(this).find(".addedText").length == 0) {
-        $(this).append($("<added class='addedText'>A</added>"));
-      }
-    });
-  }, 200);
-}
 
 function addCustomMenuOptions() {
   $("#customMenuOptions").remove();
@@ -51,7 +45,7 @@ function addCustomMenuOptions() {
     theBigLi.append(theList);
     subMenus.push(theBigLi);
   });
-  const customMenuOptions = $("<div id='customMenuOptions'><x>x</x></div>");
+  const customMenuOptions = $("<div id='customMenuOptions' class='no-link-preview'><x>x</x></div>");
   customMenuOptions.appendTo($("body"));
   const menuClone = $("ul.pureCssMenu:contains(My WikiTree)").clone();
   menuClone.attr("id", "menuClone");
@@ -63,7 +57,7 @@ function addCustomMenuOptions() {
   menuClone.find("> li > ul").each(function (index) {
     $(this).attr("id", $(this).closest("li").find(">a").text().replace(" ", "_") + "_Menu");
     let menuName = $(this).closest("li").find(">a").text().replace(" ", "_");
-    if (menuName.match(/\-[0-9]+$/) != null) {
+    if (menuName.match(/-[0-9]+$/) != null) {
       menuName = "Profile";
       $(this).closest("li").find(">a").text("Profile");
     }
@@ -91,7 +85,7 @@ function addCustomMenuOptions() {
   if (isOK(mCustomMenu)) {
     const storedCustomMenu = JSON.parse(mCustomMenu);
     storedCustomMenu.arr.forEach(function (aLink) {
-      let anLi = $("<li data-menu='" + aLink.Menu + "'><a href='" + aLink.Link + "'>" + aLink.LinkText + "</a></li>");
+      let anLi = $(`<li data-menu="${aLink.Menu}"><a href="${aLink.Link}">${aLink.LinkText}</a></li>`);
       $("#customMenu").append(anLi);
       anLi.find("a").on("click", function () {
         returnToMenu($(this).parent());
@@ -112,7 +106,7 @@ function addCustomMenuOptions() {
   });
 
   $("#customMenu").sortable({
-    update: function (event, ui) {
+    update: function () {
       storeCustomMenu();
     },
   });
@@ -123,10 +117,10 @@ function addCustomMenuOptions() {
   $("#customMenuContainer").append(addLinkForm);
   $("#addLinkFormButton").on("click", function (e) {
     e.preventDefault();
-    const regex = /[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/;
+    const regex = /[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*)/;
 
     if ($("#anyLinkLink").val().match(regex) != null && $("#anyLinkText").val() != "") {
-      const theLink = $("#anyLinkLink").val();
+      let theLink = $("#anyLinkLink").val();
       if (
         $("#anyLinkLink")
           .val()
@@ -141,7 +135,7 @@ function addCustomMenuOptions() {
       );
       anyLi.on("click", function (e) {
         e.preventDefault();
-        remove($(this));
+        $(this).remove();
       });
       $("#anyLinkLink").val("");
       $("#anyLinkText").val("");
@@ -178,7 +172,7 @@ function addCustomMenuOptions() {
 function addCustomMenu() {
   $(".pureCssMenu ul").each(function () {
     let menuTitle = $(this).prev().text().replace(" ", "_");
-    if (menuTitle.match(/\-[0-9]+$/) != null) {
+    if (menuTitle.match(/-[0-9]+$/) != null) {
       menuTitle = "Profile";
     }
     $(this).attr("data-menu", menuTitle);
@@ -205,7 +199,7 @@ function addCustomMenu() {
       let newLinkHREF = "";
       let newLinkText = "";
       if (isOK(aLink.Menu)) {
-        if (aLink.Menu.match(/\-[0-9]+$/) != null || aLink.Menu == "Profile") {
+        if (aLink.Menu.match(/-[0-9]+$/) != null || aLink.Menu == "Profile") {
           const sameOne = $(".pureCssMenum[data-menu='Profile']")
             .contents()
             .filter(function () {
@@ -262,15 +256,12 @@ function addCustomMenu() {
           dLinkText = aLink.LinkText;
         }
 
-        newLink = $(
-          "<li data-menu='" + aLink.Menu + "'><a class='pureCssMenui0' href='" + dLink + "'>" + dLinkText + "</a></li>"
-        );
+        newLink = $(`<li data-menu="${aLink.Menu}"><a class="pureCssMenui0" href="${dLink}">${dLinkText}</a></li>`);
       }
       $("#myCustomMenu").append(newLink);
     });
   }
   $("#myMenuLink").on("click", function () {
-    let toggleIt = true;
     if ($("#customMenuOptions").css("display") == "block") {
       $("#customMenuOptions").slideToggle();
     } else {
@@ -288,13 +279,17 @@ function addCustomMenu() {
 
   $("#myCustomMenu li a:contains(Random Profile)").on("click", function (e) {
     e.preventDefault();
-    const working = $("<img id='working' src='" + chrome.runtime.getURL("images/tree.gif") + "'>");
+    const working = $("<img id='working' src='" + treeImageURL + "'>");
     working.appendTo("body").css({
       position: "absolute",
-      left: `${e.pageX - 50}px`,
+      left: `${e.pageX - 150}px`,
       top: e.pageY + "px",
     });
-    getRandomProfile();
+    if (window?.randomProfileOptions?.constrainToWatchlist) {
+      goToRandomWatchlistProfile();
+    } else {
+      goToRandomProfile();
+    }
   });
   $("#myCustomMenu li a:contains(Random Profile)").on("contextmenu", function (e) {
     e.preventDefault();
@@ -305,6 +300,35 @@ function addCustomMenu() {
     $("#wte-tm-printer-friendly").trigger("click");
   });
 
+  if ($("#myCustomMenu li a:contains(What Links Here)").length) {
+    const thisURL = window.location.href;
+    let dLink = "";
+    // Edit page
+    const searchParams = new URLSearchParams(window.location.href);
+    if ($("body.page-Special_EditPerson").length) {
+      dLink = "Wiki:" + window.profileWTID;
+    } else if (searchParams.has("title")) {
+      dLink = "Wiki:" + searchParams.get("title");
+    } else if (thisURL.split(/\/wiki\//)[1]) {
+      dLink = thisURL.split(/\/wiki\//)[1];
+      if (thisURL.match(/Space:/) == null) {
+        dLink = "Wiki:" + dLink;
+      }
+    }
+
+    if (dLink) {
+      const myMenuWhatLinksHere = $("#myCustomMenu li a:contains(What Links Here)");
+      myMenuWhatLinksHere.attr(
+        "href",
+        "https://www.wikitree.com/index.php?title=Special:Whatlinkshere/" + dLink + "&limit=1000"
+      );
+      myMenuWhatLinksHere.contextmenu(function (e) {
+        e.preventDefault();
+        doWhatLinksHere(e);
+      });
+    }
+  }
+
   $("#myCustomMenu li a:contains(Drafts)").on("click", function (e) {
     e.preventDefault();
     showDraftList();
@@ -314,8 +338,8 @@ function addCustomMenu() {
 async function storeCustomMenu() {
   const arr = [];
   $("#customMenu a").each(function () {
-    const menuName = $(this).parent().data("menu");
-    if (menuName.match(/\-[0-9]+$/) != null) {
+    let menuName = $(this).parent().data("menu");
+    if (menuName.match(/-[0-9]+$/) != null) {
       menuName = "Profile";
     }
     const theText = $(this)
@@ -323,13 +347,12 @@ async function storeCustomMenu() {
       .replace(/Suggestions.*?\b/, "Suggestions")
       .replace(/^Contributions.*?\b/, "Contributions")
       .replace(/Badges.*?\b/, "Badges")
-      .replace(/Thank\-Yous.*?/, "Thank-Yous");
+      .replace(/Thank-Yous.*?/, "Thank-Yous");
     arr.push({ Link: $(this).attr("href"), LinkText: theText, Menu: menuName });
   });
   const myCustomMenu = { arr };
   const toStore = JSON.stringify(myCustomMenu);
   localStorage.setItem("customMenu", toStore);
-  const storedCustomMenu = JSON.parse(localStorage.customMenu);
 
   $("#customMenu li a").on("click", function () {
     $(this)
@@ -364,7 +387,7 @@ function returnToMenu(jq) {
     } else {
       jq.remove();
     }
-  } else if (dMenu.find("a[href='" + jq.find("a").attr("href") + "']").length < 1) {
+  } else if (dMenu.find(`a[href="${jq.find("a").attr("href")}"]`).length < 1) {
     jq.appendTo(dMenu);
     sortMenu(dMenu);
   } else {

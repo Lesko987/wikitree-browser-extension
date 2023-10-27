@@ -1,0 +1,38 @@
+#anniversariesTable_wrapper tr[data-event="birth"] {
+  background-color: #f2ffeb; /* extremely light green */
+  border-left: 3px solid green;
+}
+#anniversariesTable_wrapper tr[data-event="birth"] td:first-child {
+  border-left: 3px solid green;
+}
+
+#anniversariesTable_wrapper tr[data-event="death"] {
+  background-color: rgb(228, 227, 227);
+  border-left: 3px solid gray;
+}
+#anniversariesTable_wrapper tr[data-event="death"] td:first-child {
+  border-left: 3px solid gray;
+}
+
+#anniversariesTable_wrapper tr[data-event="marriage"] {
+  background-color: #fff5fa; /* extremely light pink */
+  border-left: 3px solid pink;
+}
+#anniversariesTable_wrapper tr[data-event="marriage"] td:first-child {
+  border-left: 3px solid pink;
+}
+#anniversariesTable {
+  display: none;
+}
+#anniversariesTable_wrapper {
+  display: none;
+}
+
+#anniversariesShakingTree {
+  z-index: 1000000;
+  height: 50px;
+  border-radius: 50%;
+  border: 2px solid forestgreen;
+  position: fixed;
+  margin-left: 2em;
+}

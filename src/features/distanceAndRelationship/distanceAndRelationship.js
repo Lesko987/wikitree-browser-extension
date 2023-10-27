@@ -4,21 +4,39 @@ Created By: Ian Beacall (Beacall-6)
 
 import $ from "jquery";
 import Cookies from "js-cookie";
-import { getPerson } from "wikitree-js";
+import { getConnectionJSON, getRelationJSON } from "../../core/API/wwwWikiTree";
+import { shouldInitializeFeature } from "../../core/options/options_storage";
 
-import { checkIfFeatureEnabled } from "../../core/options/options_storage";
+const fixOrdinalSuffix = (text) => {
+  const pattern = /(\d+)(?:st|nd|rd|th)\b/g;
+  return text.replace(pattern, (_, num) => {
+    const numInt = parseInt(num, 10);
+    let suffix = "th";
 
-checkIfFeatureEnabled("distanceAndRelationship").then((result) => {
+    if (![11, 12, 13].includes(numInt % 100)) {
+      switch (numInt % 10) {
+        case 1:
+          suffix = "st";
+          break;
+        case 2:
+          suffix = "nd";
+          break;
+        case 3:
+          suffix = "rd";
+          break;
+      }
+    }
+
+    return num + suffix;
+  });
+};
+
+shouldInitializeFeature("distanceAndRelationship").then((result) => {
   // define user and profile IDs
 
   const profileID = $("a.pureCssMenui0 span.person").text();
   const userID = Cookies.get("wikitree_wtb_UserName");
-  if (
-    result &&
-    $("body.profile").length &&
-    profileID != userID &&
-    profileID != ""
-  ) {
+  if (result && $("body.profile").length && profileID != userID && profileID != "") {
     import("./distanceAndRelationship.css");
     // set up databases
     window.connectionFinderDBVersion = 1;
@@ -123,7 +141,7 @@ checkIfFeatureEnabled("distanceAndRelationship").then((result) => {
   }
 });
 
-export async function getProfile(id, fields = "*") {
+export async function getProfile(id, fields = "*", appId = "WBE") {
   try {
     const result = await $.ajax({
       url: "https://api.wikitree.com/api.php",
@@ -131,7 +149,14 @@ export async function getProfile(id, fields = "*") {
       xhrFields: { withCredentials: true },
       type: "POST",
       dataType: "json",
-      data: { action: "getProfile", key: id, fields: fields },
+      data: {
+        action: "getProfile",
+        key: id,
+        fields: fields,
+        bioFormat: "text",
+        resolveRedirect: 1,
+        appId: appId || "WBE",
+      },
     });
     return result[0].profile;
   } catch (error) {
@@ -139,6 +164,7 @@ export async function getProfile(id, fields = "*") {
   }
 }
 
+/*
 async function getConnectionFinderResult(id1, id2, relatives = 0) {
   try {
     const result = await $.ajax({
@@ -190,6 +216,7 @@ export async function getRelationshipFinderResult(id1, id2) {
     console.error(error);
   }
 }
+*/
 
 function addRelationshipText(oText, commonAncestors) {
   const commonAncestorTextResult = commonAncestorText(commonAncestors);
@@ -202,6 +229,9 @@ function addRelationshipText(oText, commonAncestors) {
       "</ul></div>"
   );
   $("h1").after(cousinText);
+  if (cousinText.next("span.large").length > 0) {
+    cousinText.after($("<br>"));
+  }
   $("#yourRelationshipText").on("click", function (e) {
     e.stopPropagation();
     let id1 = Cookies.get("wikitree_wtb_UserName");
@@ -256,12 +286,11 @@ function commonAncestorText(commonAncestors) {
 }
 
 function doRelationshipText(userID, profileID) {
-  getRelationshipFinderResult(userID, profileID).then(function (data) {
+  //  getRelationshipFinderResult(userID, profileID).then(function (data) {
+  getRelationJSON("DistanceAndRelationship_Relationship", userID, profileID).then(function (data) {
     if (data) {
       var out = "";
       var aRelationship = true;
-      const commonAncestors = [];
-      let realOut = "";
       let dummy = $("<html></html>");
       dummy.append($(data.html));
       if (dummy.find("h1").length) {
@@ -277,9 +306,10 @@ function doRelationshipText(userID, profileID) {
           .text()
           .replaceAll(/[\t\n]/g, "");
         out = dummy.find("b").text();
-        let secondName = dummy.find("b").parent().text().split(out)[1];
+        const outOuterHTML = dummy.find("b")[0].outerHTML;
+        let secondName = dummy.find("b").parent().html().split(outOuterHTML)[1];
         let lastLink = dummy.find("#imageContainer > p > span:last-of-type a").attr("href");
-        const userFirstName = dummy.find(`p a[href\$='${userID}']`).eq(0).text().split(" ")[0];
+        const userFirstName = dummy.find(`p a[href$='${userID}']`).eq(0).text().split(" ")[0];
         const profileFirstName = $("h1 span[itemprop='name']").text().split(" ")[0];
         if (data.commonAncestors.length == 0) {
           out = dummy.find("b").text();
@@ -303,6 +333,9 @@ function doRelationshipText(userID, profileID) {
             if (profileGender == "female") {
               out = out.replace(/nephew|niece/, "aunt");
             }
+            if (out.match(/(uncle|aunt) or.*/)) {
+              out = out.split(" or ")[0];
+            }
           }
           if (
             dummy
@@ -322,6 +355,8 @@ function doRelationshipText(userID, profileID) {
         let outSplit = out.split(" ");
         outSplit[0] = ordinalWordToNumberAndSuffix(outSplit[0]);
         out = outSplit.join(" ");
+        out = fixOrdinalSuffix(out);
+        console.log(out);
         if (
           $("#yourRelationshipText").length == 0 &&
           $(".ancestorTextText").length == 0 &&
@@ -383,11 +418,12 @@ async function addDistance(data) {
 async function getDistance() {
   const id1 = Cookies.get("wikitree_wtb_UserName");
   const id2 = $("a.pureCssMenui0 span.person").text();
-  const data = await getConnectionFinderResult(id1, id2);
+  // const data = await getConnectionFinderResult(id1, id2);
+  const data = await getConnectionJSON("DistanceAndRelationship_Distance", id1, id2);
   addDistance(data);
 }
 
-function ordinal(i) {
+export function ordinal(i) {
   var j = i % 10,
     k = i % 100;
   if (j == 1 && k != 11) {
@@ -452,6 +488,44 @@ export function ordinalWordToNumberAndSuffix(word) {
     ["twenty-third", "23rd"],
     ["twenty-fourth", "24th"],
     ["twenty-fifth", "25th"],
+    ["twenty-sixth", "26th"],
+    ["twenty-seventh", "27th"],
+    ["twenty-eigth", "28th"],
+    ["twenty-ninth", "29th"],
+    ["thirtieth", "30th"],
+    ["thirty-first", "31st"],
+    ["thirty-second", "32nd"],
+    ["thirty-third", "33rd"],
+    ["thirty-fourth", "34th"],
+    ["thirty-fifth", "35th"],
+    ["thirty-sixth", "36th"],
+    ["thirty-seventh", "37th"],
+    ["thirty-eigth", "38th"],
+    ["thirty-ninth", "39th"],
+    ["fortieth", "40th"],
+    ["forty-first", "41st"],
+    ["forty-second", "42nd"],
+    ["forty-third", "43rd"],
+    ["forty-fourth", "44th"],
+    ["forty-fifth", "45th"],
+    ["forty-sixth", "46th"],
+    ["forty-seventh", "47th"],
+    ["forty-eigth", "48th"],
+    ["forty-ninth", "49th"],
+    ["fiftieth", "50th"],
+    ["fifty-first", "51st"],
+    ["fifty-second", "52nd"],
+    ["fifty-third", "53rd"],
+    ["fifty-fourth", "54th"],
+    ["fifty-fifth", "55th"],
+    ["fifty-sixth", "56th"],
+    ["fifty-seventh", "57th"],
+    ["fifty-eigth", "58th"],
+    ["fifty-ninth", "59th"],
+    ["sixtieth", "60th"],
+    ["sixty-first", "61st"],
+    ["sixty-second", "62nd"],
+    ["sixty-third", "63rd"],
   ];
   ordinalsArray.forEach(function (arr) {
     if (word == arr[0]) {
@@ -469,7 +543,7 @@ function initDistanceAndRelationship(userID, profileID, clicked = false) {
     getDistance();
     doRelationshipText(userID, profileID);
   } else {
-    getProfile(profileID)
+    getProfile(profileID, undefined, "WBE_distanceAndRelationship")
       .then((person) => {
         if (person.Privacy > 29 && person.Connected == 1) {
           getDistance();

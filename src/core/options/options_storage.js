@@ -8,18 +8,36 @@ This function returns a Promise so it can be used in a couple of different ways:
 
 1. Using then:
 
-  checkIfFeatureEnabled("agc").then((result) => {
+  shouldInitializeFeature("agc").then((result) => {
     if (result) {
       initAgc();
     }
-  });
+  }); 
 
 2. Using await:
 
-  if (await checkIfFeatureEnabled("agc") {
+  if (await shouldInitializeFeature("agc") {
     initAgc();
   });
 */
+
+async function shouldInitializeFeature(featureId) {
+  const result = await checkIfFeatureEnabled(featureId);
+  if (result) {
+    if (document.documentElement.getAttribute(`data-wbe-${featureId}`)) {
+      // prevent each feature from initializing more than once in a single window
+      document.documentElement.setAttribute(
+        "data-wbe-conflict",
+        `${document.documentElement.getAttribute("data-wbe-conflict") ?? Date.now().toString()} ${featureId}`
+      );
+      return false;
+    } else {
+      document.documentElement.setAttribute(`data-wbe-${featureId}`, Date.now().toString());
+      return true;
+    }
+  }
+  return false;
+}
 
 async function checkIfFeatureEnabled(featureId) {
   return new Promise((resolve, reject) => {
@@ -49,8 +67,8 @@ async function checkIfFeatureEnabled(featureId) {
           featureData.pages.forEach((element) => {
             if (!result) {
               result = element;
-            }  
-          })
+            }
+          });
         }
 
         resolve(result);
@@ -144,4 +162,4 @@ async function getFeatureOptions(featureId) {
   });
 }
 
-export { checkIfFeatureEnabled, getFeatureOptions, getEnabledStateForAllFeatures };
+export { shouldInitializeFeature, checkIfFeatureEnabled, getFeatureOptions, getEnabledStateForAllFeatures };

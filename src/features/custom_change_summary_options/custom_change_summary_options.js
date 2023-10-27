@@ -3,18 +3,26 @@ Created By: Ian Beacall (Beacall-6)
 */
 
 import $ from "jquery";
-import { checkIfFeatureEnabled, getFeatureOptions } from "../../core/options/options_storage";
+import { shouldInitializeFeature, getFeatureOptions } from "../../core/options/options_storage";
+import { isSpaceEdit } from "../../core/pageType";
 
-checkIfFeatureEnabled("customChangeSummaryOptions").then((result) => {
+shouldInitializeFeature("customChangeSummaryOptions").then(async (result) => {
   if (result && $("#saveStuff").length == 0) {
-    import("./custom_change_summary_options.css");
+    if (isSpaceEdit) {
+      const options = await getFeatureOptions("customChangeSummaryOptions");
+      if (!options.showOnSpacePages) {
+        return;
+      }
+    }
+    await import("./custom_change_summary_options.css");
     addMovingSaveBox();
   }
 });
+
 const validationContainer = $("#validationContainer");
 async function addMovingSaveBox() {
   const sco = $(".six.columns.omega").eq(0);
-  if ($("#saveStuff").length == 0 && $("body.page-Special_EditPerson").length && $("#removeSpouse").length == 0) {
+  if ($("#saveStuff").length == 0 && $("#removeSpouse").length == 0) {
     const saveStuff = $("<div id='saveStuff'></div>");
     saveStuff.append($("#wpSummary").parent());
     saveStuff.append($("#wpSaveDraft").parent());
@@ -34,7 +42,6 @@ async function addMovingSaveBox() {
     setTimeout(() => {
       $("#changeSummaryGears").on("click", function (event) {
         $("#changeSummaryOptions").toggle();
-        console.log("here");
       });
       $("#changeSummaryOptions x").on("click", function () {
         $("#changeSummaryOptions").hide();
@@ -44,8 +51,6 @@ async function addMovingSaveBox() {
         let currentLS = localStorage.getItem("LSchangeSummaryOptions");
         if (currentLS == null) {
           currentLS = "";
-          if (currentLS.match(/@@/) == null) {
-          }
         }
 
         localStorage.setItem("LSchangeSummaryOptions", currentLS + $("#newOption").val() + "@@");
@@ -93,7 +98,12 @@ async function addMovingSaveBox() {
     }
 
     saveStuff.insertAfter(validationContainer);
-    const tca = $(".ten.columns.alpha").eq(0);
+    if (isSpaceEdit) {
+      $("#wpSummaryLabel").parent().prependTo(saveStuff);
+      $("a:contains(without saving)").parent().appendTo(saveStuff);
+      saveStuff.appendTo($("#editform"));
+    }
+    //const tca = $(".ten.columns.alpha").eq(0);
     saveStuff.css({ border: "1px forestgreen solid", padding: "1em" });
     const dRadios = $("#saveStuff label input[type='radio']");
     dRadios.attr("type", "checkbox");
@@ -113,7 +123,7 @@ async function addMovingSaveBox() {
     $("#wpSummaryTextArea").hide("swing");
   });
 
-  $("#wpSummary").on("keyup click paste change", function () {
+  $("body.page-Special_EditPerson #wpSummary").on("keyup click paste change", function () {
     $("#wpSummaryTextArea").text($("#wpSummary").val());
     showHideTextArea();
   });
@@ -123,8 +133,8 @@ async function addMovingSaveBox() {
   if (options.movingSaveBox) {
     $("#saveStuff").prependTo(sco);
     $(window).on("scroll", function () {
-      let scroll = $(window).scrollTop();
-      const previewBox = $("#previewbox");
+      //let scroll = $(window).scrollTop();
+      //const previewBox = $("#previewbox");
       if (
         isScrolledIntoView($("#previewButton")) ||
         isScrolledPast($("#previewButton")) ||
@@ -219,7 +229,8 @@ function setChangeSummaryOptions(adding = 0) {
           var v = thisThing.val();
           var summary = $("#wpSummary").val();
           if (!summary.includes(v)) {
-            summary += v;
+            summary += " " + v;
+            summary = summary.trim();
             if (summary.length > 150) {
               summary = summary.substring(0, 149);
             }
@@ -259,20 +270,18 @@ function setChangeSummaryOptions(adding = 0) {
 function summaryBox(el, added = false) {
   const thisText = el.val();
   if (added == true) {
-    $("#wpSummary").val($("#wpSummary").val() + thisText);
+    $("#wpSummary").val(($("#wpSummary").val() + " " + thisText).replace(/\s+/g, " ").trim());
   }
 
   if (el.prop("checked") == false) {
-    $("#wpSummary").val($("#wpSummary").val().replace(thisText, ""));
-    $("#wpSummary").val($("#wpSummary").val().replace(/\s\s/, " "));
+    let thisTextTrimmed = thisText.trim();
+    $("#wpSummary").val(function (index, value) {
+      return value.replaceAll(thisTextTrimmed, "");
+    });
+    $("#wpSummary").val($("#wpSummary").val().replace(/\s+/g, " ").trim());
   } else {
-    const aRegex = new RegExp("[^s]" + thisText);
-    const matching = $("#wpSummary").val().match(aRegex);
-    if (matching != null) {
-    }
-  }
-
-  if ($("#wpSummaryTextArea").length == 0) {
+    //const aRegex = new RegExp("[^s]" + thisText);
+    //const matching = $("#wpSummary").val().match(aRegex);
   }
   $("#wpSummaryTextArea").text($("#wpSummary").val());
 
@@ -280,14 +289,20 @@ function summaryBox(el, added = false) {
 }
 
 function showHideTextArea() {
-  $("#wpSummaryTextArea").show();
+  $("body.page-Special_EditPerson #wpSummaryTextArea").show();
   if (window.timer != undefined) {
     clearTimeout(window.timer); //cancel the previous timer.
     window.timer = null;
   }
+  let wait = 5000;
+
+  if (isSpaceEdit) {
+    wait = 1000;
+  }
+
   window.timer = setTimeout(function () {
     $("#wpSummaryTextArea").hide("swing");
-  }, 5000);
+  }, wait);
 }
 
 function isScrolledIntoView(elem) {
@@ -305,7 +320,7 @@ function isScrolledIntoView(elem) {
 function isScrolledPast(elem) {
   if (elem.length) {
     var docViewTop = $(window).scrollTop();
-    var docViewBottom = docViewTop + $(window).height();
+    // var docViewBottom = docViewTop + $(window).height();
     var elemTop = $(elem).offset().top;
     var elemBottom = elemTop + $(elem).height();
     if (elemBottom < docViewTop) {
@@ -320,7 +335,8 @@ function isScrolledPast(elem) {
 
 function sortChangeSummaryOptions() {
   if ($("#saveStuff").length) {
-    const theLabels = $("#saveStuff p label");
+    const allLabels = $("#saveStuff label");
+    const theLabels = allLabels.filter(":has(input[type=checkbox])");
     const aSpan = $("<span id='saveStuffLabels'></span>");
     aSpan.insertBefore(theLabels.eq(0));
     theLabels.appendTo(aSpan);
@@ -344,4 +360,12 @@ function sortChangeSummaryOptions() {
   $("#saveStuffLabels label input").each(function () {
     $(this).attr("tabindex", "0");
   });
+
+  // Remove 'Examples:' on space page
+  $(".editOptions")
+    .contents()
+    .filter(function () {
+      return this.nodeType === 3 && this.nodeValue.trim() === "Examples:";
+    })
+    .remove();
 }
